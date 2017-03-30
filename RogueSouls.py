@@ -3,7 +3,7 @@ import random
 import math
 import textwrap
 import sys
-import dictionaries as dict
+import dictionaries as dicts
 
 # Global variables
 LIMIT_FPS = 20
@@ -159,12 +159,10 @@ class Item:
 
 
 class Equipment:
-    def __init__(self, slot=None, ele_aff=None, durability=0, att_styles={}, att_times={}, dmg_block=0):
+    def __init__(self, slot=None, element=None, durability=0, dmg_block=0):
         self.slot = slot
-        self.ele_aff = ele_aff
+        self.element = element
         self.durability = durability
-        self.att_styles = att_styles
-        self.att_times = att_times
         self.dmg_block = dmg_block
 
         self.is_equipped = False
@@ -238,10 +236,10 @@ class Fighter:
     # well as defining actions they can take during combat
     def __init__(self, vig=0, att=0, end=0, str=0, dex=0, int=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
                  att_slots=0, right1=None, right2=None, right3=None, left1=None, left2=None, left3=None, head=None,
-                 chest=None, legs=None, arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_strike=0,
-                 def_slash=0, def_thrust=0, def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0,
+                 chest=None, legs=None, arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0,
+                 def_blunt=0, def_piercing=0, def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0,
                  res_frost=0, res_curse=0, bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1,
-                 soul_value=0, wait_time=0, dodge_frames=DODGE_TIME, in_combat=False, inventory=[]):
+                 soul_value=0, wait_time=0, dodge_frames=DODGE_TIME, in_combat=False, inventory=[], blocking=False):
         self.vig = vig
         self.att = att
         self.end = end
@@ -269,9 +267,9 @@ class Fighter:
         self.ring2 = ring2
         self.neck = neck
         self.def_phys = def_phys
-        self.def_strike = def_strike
         self.def_slash = def_slash
-        self.def_thrust = def_thrust
+        self.def_blunt = def_blunt
+        self.def_piercing = def_piercing
         self.def_mag = def_mag
         self.def_fire = def_fire
         self.def_lightn = def_lightn
@@ -292,6 +290,7 @@ class Fighter:
         self.in_combat = in_combat
         self.inventory = inventory
         self.action_queue = []
+        self.blocking = blocking
 
         # Beginning of derived statistics
 
@@ -355,37 +354,79 @@ class Fighter:
         self.curr_r = right1
         self.curr_l = left2
 
-    def attack_left_light(self):
-        self.attack_handler("left", self.left1.light)
+    def handle_attack_move(self, side):
+        libtcod.console_wait_for_keypress(True)
+        libtcod.console_wait_for_keypress(True)
 
-    def attack_left_med(self):
-        self.attack_handler("left", self.left1.med)
+        if libtcod.console_is_key_pressed(libtcod.KEY_UP) or libtcod.console_is_key_pressed(libtcod.KEY_KP8):
+            self.attack_menu_handler(side, (0, -1))
 
-    def attack_left_heavy(self):
-        self.attack_handler("left", self.left1.heavy)
+        elif libtcod.console_is_key_pressed(libtcod.KEY_DOWN) or libtcod.console_is_key_pressed(libtcod.KEY_KP2):
+            self.attack_menu_handler(side, (0, 1))
 
-    def attack_right_light(self):
-        self.attack_handler("right", self.right1.light)
+        elif libtcod.console_is_key_pressed(libtcod.KEY_LEFT) or libtcod.console_is_key_pressed(libtcod.KEY_KP4):
+            self.attack_menu_handler(side, (-1, 0))
 
-    def attack_right_med(self):
-        self.attack_handler("right", self.right1.med)
+        elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT) or libtcod.console_is_key_pressed(libtcod.KEY_KP6):
+            self.attack_menu_handler(side, (1, 0))
 
-    def attack_right_heavy(self):
-        self.attack_handler("right", self.right1.heavy)
+        elif libtcod.console_is_key_pressed(libtcod.KEY_KP7):
+            self.attack_menu_handler(side, (-1, -1))
 
-    def attack_handler(self, wep_side, att_type):
-        self.attack(wep_side, att_type)
+        elif libtcod.console_is_key_pressed(libtcod.KEY_KP9):
+            self.attack_menu_handler(side, (1, -1))
 
-    def attack(self, wep_side, att_type):
-        if wep_side is "right":
-            weapon = self.curr_r
-        else:
-            weapon = self.curr_l
-        att_style = weapon_att_styles[str(weapon) + ' ' + str(att_type)]
-        target = in_front(self, self.facing)
+        elif libtcod.console_is_key_pressed(libtcod.KEY_KP1):
+            self.attack_menu_handler(side, (-1, 1))
+
+        elif libtcod.console_is_key_pressed(libtcod.KEY_KP3):
+            self.attack_menu_handler(side, (1, 1))
+
+    def attack_menu_handler(self, side, dir):
+        if side is "right":
+            right_wep = get_equipped_in_slot("right1")
+            if right_wep is None:
+                right_wep_name = "Unarmed"
+            else:
+                right_wep_name = right_wep.owner.owner.name
+            wep_dict = get_wep_dict(right_wep_name)
+            dmg_type_dict = get_style_from_dict(wep_dict[1][0])
+            choice = menu(str(wep_dict[0]) + ":", ["Light: " + dmg_type_dict[1][0] + ", " + wep_dict[1][1] + "f",
+                                                   "Medium: " + dmg_type_dict[1][1] + ", " + wep_dict[1][2] + "f",
+                                                   "Hard: " + dmg_type_dict[1][2] + ", " + wep_dict[1][3] + "f"], 24)
+            if choice is 0:
+                self.attack("right", dmg_type_dict[1][0], wep_dict[1][1], dir, "light", wep_dict[1][4])
+            elif choice is 1:
+                self.attack("right", dmg_type_dict[1][1], wep_dict[1][2], dir, "med", wep_dict[1][4])
+            elif choice is 2:
+                self.attack("right", dmg_type_dict[1][2], wep_dict[1][3], dir, "hard", wep_dict[1][4])
+        elif side is "left":
+            left_wep = get_equipped_in_slot("left1")
+            if left_wep is None:
+                left_wep_name = "Unarmed"
+            else:
+                left_wep_name = left_wep.owner.owner.name
+            wep_dict = get_wep_dict(left_wep_name)
+            dmg_type_dict = get_style_from_dict(wep_dict[1][0])
+            choice = menu("" + str(wep_dict[0]) + ":", ["Light: " + dmg_type_dict[1][0] + ", " + wep_dict[1][1] + "f",
+                                                        "Medium: " + dmg_type_dict[1][1] + ", " + wep_dict[1][2] + "f",
+                                                        "Hard: " + dmg_type_dict[1][2] + ", " + wep_dict[1][3] + "f"], 24)
+            if choice is 0:
+                self.attack("left", dmg_type_dict[1][0], wep_dict[1][1], dir, "light", wep_dict[1][4])
+            elif choice is 1:
+                self.attack("left", dmg_type_dict[1][1], wep_dict[1][2], dir, "med", wep_dict[1][4])
+            elif choice is 2:
+                self.attack("left", dmg_type_dict[1][2], wep_dict[1][3], dir, "hard", wep_dict[1][4])
+        return "end_turn"
+
+    def attack(self, wep_side, dmg_type, speed, dir, style, dmg):
+        target = None
+        for obj in objects:
+            if (obj.x - player.x, obj.y - player.y) == dir:
+                target = obj
         if target:
-            self.att_damage(target, wep_side, att_style)
-        self.wait_time += weapon_times[str(weapon) + ' ' + str(att_type)]
+            self.att_damage(target.fighter, wep_side, dmg_type, style, int(dmg))
+        self.wait_time += int(speed)
 
     def dodge(self):
         # TODO: add frames equal to speed plus bonuses to wait_time
@@ -408,20 +449,19 @@ class Fighter:
         else:
             action()
 
-    def att_damage(self, target, wep_side, att_type):
+    def att_damage(self, target, wep_side, dmg_type, style, dmg):
         if wep_side is "right":
-            type_list = self.curr_r.dmgtype
-            eff_list = self.curr_r.effects
-            if "phys" in type_list:
-                deal_phys_dmg(target, self.curr_r, att_type)
-            if "mag" in type_list:
-                deal_mag_dmg(target, self.curr_r)
-            if "fire" in type_list:
-                deal_fire_dmg(target, self.curr_r)
-            if "lightn"in type_list:
-                deal_lightn_dmg(target, self.curr_r)
-            if "dark" in type_list:
-                deal_dark_dmg(target, self.curr_r)
+            eff_list = []
+            if dmg_type == "slashing" or dmg_type == "blunt" or dmg_type == "piercing":
+                deal_phys_dmg(target, style, dmg, dmg_type)
+            if dmg_type == "mag":
+                deal_mag_dmg(target, style, dmg)
+            if dmg_type == "fire":
+                deal_fire_dmg(target, style, dmg)
+            if dmg_type == "lightn":
+                deal_lightn_dmg(target, style, dmg)
+            if dmg_type == "dark":
+                deal_dark_dmg(target, style, dmg)
             if "bleed" in eff_list:
                 add_bleed(target, self.curr_r)
             if "poison" in eff_list:
@@ -431,18 +471,17 @@ class Fighter:
             if "curse" in eff_list:
                 add_curse(target, self.curr_r)
         else:
-            type_list = self.curr_l.dmgtype
-            eff_list = self.curr_l.effects
-            if "phys" in type_list:
-                deal_phys_dmg(target, self.curr_l, att_type)
-            if "mag" in type_list:
-                deal_mag_dmg(target, self.curr_l)
-            if "fire" in type_list:
-                deal_fire_dmg(target, self.curr_l)
-            if "lightn"in type_list:
-                deal_lightn_dmg(target, self.curr_l)
-            if "dark" in type_list:
-                deal_dark_dmg(target, self.curr_l)
+            eff_list = []
+            if dmg_type == "slashing" or dmg_type == "blunt" or dmg_type == "piercing":
+                deal_phys_dmg(target, style, dmg, dmg_type)
+            if dmg_type == "mag":
+                deal_mag_dmg(target, style, dmg)
+            if dmg_type == "fire":
+                deal_fire_dmg(target, style, dmg)
+            if dmg_type == "lightn":
+                deal_lightn_dmg(target, style, dmg)
+            if dmg_type == "dark":
+                deal_dark_dmg(target, style, dmg)
             if "bleed" in eff_list:
                 add_bleed(target, self.curr_l)
             if "poison" in eff_list:
@@ -473,47 +512,54 @@ class AI:
 #################################
 # damage functions
 #################################
-def deal_phys_dmg(target, curr_wep, att_type):
+def deal_phys_dmg(target, style, dmg, dmg_type=None):
     dmg_reduc = target.def_phys / 100
     if target.blocking:
         dmg_reduc += target.curr_l.def_phys / 100
-    if att_type is "slash":
+    if dmg_type is "slashing":
         dmg_reduc += target.def_slash / 100
-    elif att_type is "strike":
-        dmg_reduc += target.def_slash / 100
-    elif att_type is "thrust":
-        dmg_reduc += target.def_slash / 100
+    elif dmg_type is "blunt":
+        dmg_reduc += target.def_blunt / 100
+    elif dmg_type is "piercing":
+        dmg_reduc += target.def_piercing / 100
     if dmg_reduc > 1:
         dmg_reduc = 1
-    target.hp -= curr_wep.dmg_phys - round(dmg_reduc * curr_wep.dmg_phys)
+    if style == "light":
+        dmg = dmg * 0.75
+    elif style == "hard":
+        dmg = dmg * 1.25
+    final_dmg = math.ceil(dmg - round(dmg_reduc * dmg))
+    target.curr_hp -= final_dmg
+    print(target.curr_hp)
+    message(str(target.owner.name) + " was dealt " + str(final_dmg) + " damage!")
 
 
 def deal_mag_dmg(target, curr_wep):
     dmg_reduc = target.def_mag / 100
     if dmg_reduc > 1:
         dmg_reduc = 1
-    target.hp -= curr_wep.dmg_mag - round(dmg_reduc * curr_wep.dmg_mag)
+    target.curr_hp -= curr_wep.dmg_mag - round(dmg_reduc * curr_wep.dmg_mag)
 
 
 def deal_fire_dmg(target, curr_wep):
     dmg_reduc = target.def_fire / 100
     if dmg_reduc > 1:
         dmg_reduc = 1
-    target.hp -= curr_wep.dmg_fire - round(dmg_reduc * curr_wep.dmg_fire)
+    target.curr_hp -= curr_wep.dmg_fire - round(dmg_reduc * curr_wep.dmg_fire)
 
 
 def deal_lightn_dmg(target, curr_wep):
     dmg_reduc = target.def_lightn / 100
     if dmg_reduc > 1:
         dmg_reduc = 1
-    target.hp -= curr_wep.dmg_lightn - round(dmg_reduc * curr_wep.dmg_lightn)
+    target.curr_hp -= curr_wep.dmg_lightn - round(dmg_reduc * curr_wep.dmg_lightn)
 
 
 def deal_dark_dmg(target, curr_wep):
     dmg_reduc = target.def_dark / 100
     if dmg_reduc > 1:
         dmg_reduc = 1
-    target.hp -= curr_wep.dmg_dark - round(dmg_reduc * curr_wep.dmg_dark)
+    target.curr_hp -= curr_wep.dmg_dark - round(dmg_reduc * curr_wep.dmg_dark)
 
 
 #################################
@@ -677,6 +723,18 @@ def get_all_equipped(obj):
         return []  # other objects have no equipment (for now)
 
 
+def get_wep_dict(wep):
+    for item in dicts.weapons.items():
+        if item[0] == wep:
+            return item
+
+
+def get_style_from_dict(style):
+    for item in dicts.weapon_styles.items():
+        if item[0] == style:
+            return item
+
+
 ############################################
 # object-related functions
 ############################################
@@ -752,8 +810,8 @@ def make_world_map():
 
     # fill map with unblocked tiles
     world_map = [[Tile(False)
-            for y in range(MAP_HEIGHT)]
-                for x in range(MAP_WIDTH)]
+                 for y in range(MAP_HEIGHT)]
+                 for x in range(MAP_WIDTH)]
 
     world_map[30][22].blocked = True
     world_map[30][22].block_sight = True
@@ -830,13 +888,13 @@ def handle_keys():
     elif key.c == ord('d'):
         drop_menu()
 
-    elif key.c == ord('+'):
+    elif key.c == ord('.'):
         # TODO: right side attack menu
-        return None
+        player.fighter.handle_attack_move("right")
 
-    elif key.c == ord('-'):
+    elif key.c == ord(','):
         # TODO: left side attack menu
-        return None
+        player.fighter.handle_attack_move("left")
 
 
 def get_names_under_mouse():
@@ -1027,7 +1085,7 @@ def new_game():
     player = Object(0, 0, '@', "Player", libtcod.gray, fighter=fighter_comp, player=player_comp)
     objects.append(player)
 
-    enemy_fighter_comp = Fighter()
+    enemy_fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 15)
     ai_comp = AI('ConstantAttack')
     enemy = Object(15, 15, 'T', "Test Enemy", libtcod.dark_red, fighter=enemy_fighter_comp, ai=ai_comp)
     objects.append(enemy)
@@ -1039,11 +1097,11 @@ def new_game():
     game_state = 'playing'
 
     # a warm welcoming message!
-    message('You awaken with a burning desire. You feel as if you should recognize this place, but the feeling quickly fades.', libtcod.red)
+    message('You awaken with a burning desire. You feel as if you should recognize this place. The walls are covered in'
+            ' rot and the stench of death is in the air.', libtcod.red)
 
     # initial equipment: a broken sword
-    equipment_component = Equipment(slot='hand', durability=10, att_styles={'light': 'thrust', 'heavy': 'slash'},
-                                    att_times={'light': 10, 'heavy': 35})
+    equipment_component = Equipment(slot='hand', durability=10)
     item_comp = Item(weight=2, uses=0, equipment=equipment_component)
     sword = Object(0, 0, '-', name="Broken Sword", color=libtcod.sky, block_sight=False, item=item_comp, always_visible=True)
     player.fighter.inventory.append(sword)
@@ -1074,8 +1132,8 @@ def play_game():
 
         # let monsters take their turn
         if game_state == 'combat':
-            for object in objects:
-                if object.in_combat:
+            for obj in objects:
+                if obj.in_combat:
                     # combat()
                     pass
 
@@ -1083,15 +1141,12 @@ def play_game():
 def quit_game():
     sys.exit()
 
-
 # Initialization of game-state variables and game functions
 mouse = libtcod.Mouse()
 key = libtcod.Key()
 objects = [] # everything in the game that isn't a tile
 game_msgs = [] # buffer of the messages that appear on the screen
 game_state = 'menu'
-weapon_att_styles = {'Broken Sword light': 'thrust', 'Broken Sword heavy': 'slash', 'Short Sword light': 'slash', 'Short Sword heavy': 'thrust'}
-weapon_times = {'Broken Sword light': 10, 'Broken Sword heavy': 35, 'Short Sword light': 15, 'Short Sword heavy': 30}
 
 # libtcod.console_set_custom_font('terminal10x10_gs_tc.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
 libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, "RogueSouls", False)
