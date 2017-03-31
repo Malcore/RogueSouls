@@ -239,7 +239,8 @@ class Fighter:
                  chest=None, legs=None, arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0,
                  def_blunt=0, def_piercing=0, def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0,
                  res_frost=0, res_curse=0, bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1,
-                 soul_value=0, wait_time=0, dodge_frames=DODGE_TIME, in_combat=False, inventory=[], blocking=False):
+                 soul_value=0, wait_time=0, dodge_frames=DODGE_TIME, in_combat=False, inventory=[], blocking=False,
+                 death_func=None):
         self.vig = vig
         self.att = att
         self.end = end
@@ -291,6 +292,7 @@ class Fighter:
         self.inventory = inventory
         self.action_queue = []
         self.blocking = blocking
+        self.death_func = death_func
 
         # Beginning of derived statistics
 
@@ -450,18 +452,19 @@ class Fighter:
             action()
 
     def att_damage(self, target, wep_side, dmg_type, style, dmg):
+        died = False
         if wep_side is "right":
             eff_list = []
             if dmg_type == "slashing" or dmg_type == "blunt" or dmg_type == "piercing":
-                deal_phys_dmg(target, style, dmg, dmg_type)
+                died = deal_phys_dmg(target, style, dmg, dmg_type)
             if dmg_type == "mag":
-                deal_mag_dmg(target, style, dmg)
+                died = deal_mag_dmg(target, style, dmg)
             if dmg_type == "fire":
-                deal_fire_dmg(target, style, dmg)
+                died = deal_fire_dmg(target, style, dmg)
             if dmg_type == "lightn":
-                deal_lightn_dmg(target, style, dmg)
+                died = deal_lightn_dmg(target, style, dmg)
             if dmg_type == "dark":
-                deal_dark_dmg(target, style, dmg)
+                died = deal_dark_dmg(target, style, dmg)
             if "bleed" in eff_list:
                 add_bleed(target, self.curr_r)
             if "poison" in eff_list:
@@ -473,15 +476,15 @@ class Fighter:
         else:
             eff_list = []
             if dmg_type == "slashing" or dmg_type == "blunt" or dmg_type == "piercing":
-                deal_phys_dmg(target, style, dmg, dmg_type)
+                died = deal_phys_dmg(target, style, dmg, dmg_type)
             if dmg_type == "mag":
-                deal_mag_dmg(target, style, dmg)
+                died = deal_mag_dmg(target, style, dmg)
             if dmg_type == "fire":
-                deal_fire_dmg(target, style, dmg)
+                died = deal_fire_dmg(target, style, dmg)
             if dmg_type == "lightn":
-                deal_lightn_dmg(target, style, dmg)
+                died = deal_lightn_dmg(target, style, dmg)
             if dmg_type == "dark":
-                deal_dark_dmg(target, style, dmg)
+                died = deal_dark_dmg(target, style, dmg)
             if "bleed" in eff_list:
                 add_bleed(target, self.curr_l)
             if "poison" in eff_list:
@@ -490,6 +493,16 @@ class Fighter:
                 add_frost(target, self.curr_l)
             if "curse" in eff_list:
                 add_curse(target, self.curr_l)
+        if died:
+            message(str(target.owner.name) + "has died!")
+            target.death()
+
+    def death(self):
+        if self.death_func:
+            func = self.death_func
+            func()
+        else:
+            basic_death(self)
 
 
 class AI:
@@ -530,7 +543,8 @@ def deal_phys_dmg(target, style, dmg, dmg_type=None):
         dmg = dmg * 1.25
     final_dmg = math.ceil(dmg - round(dmg_reduc * dmg))
     target.curr_hp -= final_dmg
-    print(target.curr_hp)
+    if target.curr_hp <= 0:
+        return True
     message(str(target.owner.name) + " was dealt " + str(final_dmg) + " damage!")
 
 
@@ -539,6 +553,8 @@ def deal_mag_dmg(target, curr_wep):
     if dmg_reduc > 1:
         dmg_reduc = 1
     target.curr_hp -= curr_wep.dmg_mag - round(dmg_reduc * curr_wep.dmg_mag)
+    if target.curr_hp <= 0:
+        return True
 
 
 def deal_fire_dmg(target, curr_wep):
@@ -546,6 +562,8 @@ def deal_fire_dmg(target, curr_wep):
     if dmg_reduc > 1:
         dmg_reduc = 1
     target.curr_hp -= curr_wep.dmg_fire - round(dmg_reduc * curr_wep.dmg_fire)
+    if target.curr_hp <= 0:
+        return True
 
 
 def deal_lightn_dmg(target, curr_wep):
@@ -553,6 +571,8 @@ def deal_lightn_dmg(target, curr_wep):
     if dmg_reduc > 1:
         dmg_reduc = 1
     target.curr_hp -= curr_wep.dmg_lightn - round(dmg_reduc * curr_wep.dmg_lightn)
+    if target.curr_hp <= 0:
+        return True
 
 
 def deal_dark_dmg(target, curr_wep):
@@ -560,6 +580,8 @@ def deal_dark_dmg(target, curr_wep):
     if dmg_reduc > 1:
         dmg_reduc = 1
     target.curr_hp -= curr_wep.dmg_dark - round(dmg_reduc * curr_wep.dmg_dark)
+    if target.curr_hp <= 0:
+        return True
 
 
 #################################
@@ -579,6 +601,15 @@ def add_frost(target, curr_wep):
 
 def add_curse(target, curr_wep):
     target.curse_amt += curr_wep.eff_curse - round(target.res_curse / 100 * curr_wep.eff_curse)
+
+
+############################################
+# death functions
+############################################
+def basic_death(fighter):
+    for obj in objects:
+        if obj is fighter.owner:
+            objects.remove(obj)
 
 
 ############################################
@@ -1081,7 +1112,7 @@ def new_game():
 
     # first create the player out of its components
     player_comp = Player()
-    fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 15)
+    fighter_comp = Fighter(1, 1, 1, 1, 1, 1, 1, 1, 0)
     player = Object(0, 0, '@', "Player", libtcod.gray, fighter=fighter_comp, player=player_comp)
     objects.append(player)
 
