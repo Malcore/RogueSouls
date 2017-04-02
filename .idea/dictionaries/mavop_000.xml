@@ -1,8 +1,10 @@
 <component name="ProjectDictionaryState">
   <dictionary name="mavop_000">
     <words>
+      <w>blit</w>
       <w>libtcod</w>
       <w>skillpoints</w>
+      <w>unequip</w>
     </words>
   </dictionary>
 </component>

@@ -6,8 +6,8 @@ SMAPW = 20
 SMAPH = 20
 
 SkillNode = namedtuple('SkillNode', ['description', 'effect', 'taken'])
-WeaponDamageTypes = namedtuple('typeName', ['l_att', 'm_att', 'h_att'])
-Weapon = namedtuple('weaponName', ['wep_type', 'damage', 'l_time', 'm_time', 'h_time'])
+WeaponDamageTypes = namedtuple('typeName', ['l_att', 'h_att'])
+Weapon = namedtuple('weaponName', ['wep_type', 'damage', 'l_time', 'h_time'])
 
 items = []
 
@@ -25,27 +25,26 @@ skillgraph = {
     'skill4': []
 }
 
-# damage types: basic: slashing, blunt, piercing
+# damage types: basic: slash, blunt, pierce
 # complex: thrust (slash/piercing), bludgeoning (blunt/piercing), chop (slash/blunt)
 # weapon styles have
 weapon_styles = {
-    # fist weapons: stab, punch, smash
-    'fist': WeaponDamageTypes('piercing', 'blunt', 'blunt'),
+    # fist weapons: punch, smash
+    'fist': WeaponDamageTypes('blunt', 'blunt'),
 
-    # small swords: underhanded swing, overhand/around swing, short thrust
-    'small_sword': WeaponDamageTypes('slashing', 'slashing', 'piercing'),
+    # small swords: underhanded swing, short thrust
+    'small_sword': WeaponDamageTypes('slash', 'pierce'),
 
-    # bastard swords: one-handed thrust, two-handed slash, overhead chop
-    'bastard_sword': WeaponDamageTypes('thrust', 'slash', 'chop')
+    # bastard swords: one-handed slash, overhead chop
+    'bastard_sword': WeaponDamageTypes('slash', 'chop'),
 
     # long swords: two-handed slash, two-handed
+    'long_swords': WeaponDamageTypes('', '')
 }
 
 weapons = {
-    'Unarmed': Weapon('fist', '4', '7', '10', '2'),
-    'Broken Sword': Weapon('small_sword', '10', '20', '35', '4'),
-    'Short Sword': Weapon('small_sword', '15', '20', '30', '10')
+    'Unarmed': Weapon('fist', '4', '7', '12'),
+    'Broken Sword': Weapon('small_sword', '6', '10', '10'),
+    'Short Sword': Weapon('small_sword', '15', '10', '12')
 }
 
-weapon_att_styles = {'Broken Sword light': 'thrust', 'Broken Sword heavy': 'slash', 'Short Sword light': 'slash', 'Short Sword heavy': 'thrust'}
-weapon_times = {'Broken Sword light': 10, 'Broken Sword heavy': 35, 'Short Sword light': 15, 'Short Sword heavy': 30}
