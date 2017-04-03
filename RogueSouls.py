@@ -956,12 +956,52 @@ def equip_or_unequip(index):
 
 def equipment_menu():
     # TODO: fix equipment menu by showing each equipment slot and what is currently equipped there
-    equipped = get_all_equipped(player)
-    if len(equipped) is 0:
-        options = ['No items equipped']
+    options = []
+    if player.fighter.head:
+        options.append("Head: " + str(player.fighter.head.owner.owner.name))
     else:
-        options = [item.name for item in equipped]
-        options.append("Close menu")
+        options.append("Head: None")
+    if player.fighter.chest:
+        options.append("Chest: " + str(player.fighter.chest.owner.owner.name))
+    else:
+        options.append("Chest: None")
+    if player.fighter.arms:
+        options.append("Arms: " + str(player.fighter.arms.owner.owner.name))
+    else:
+        options.append("Arms: None")
+    if player.fighter.legs:
+        options.append("Legs: " + str(player.fighter.legs.owner.owner.name))
+    else:
+        options.append("Legs: None")
+    if player.fighter.neck:
+        options.append("Neck: " + str(player.fighter.neck.owner.owner.name))
+    else:
+        options.append("Necks: None")
+    if player.fighter.ring1:
+        options.append("Right Ring: " + str(player.fighter.ring1.owner.owner.name))
+    else:
+        options.append("Right Ring: None")
+    if player.fighter.ring2:
+        options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name))
+    else:
+        options.append("Left Ring: None")
+    if player.fighter.right1:
+        options.append("Right Hand: " + str(player.fighter.right1.owner.owner.name))
+    else:
+        options.append("Right Hand: None")
+    if player.fighter.left1:
+        options.append("Left Hand: " + str(player.fighter.left1.owner.owner.name))
+    else:
+        options.append("Left Hand: None")
+    if player.fighter.right2:
+        options.append("Right Quickslot: " + str(player.fighter.right2.owner.owner.name))
+    else:
+        options.append("Right Quickslot: None")
+    if player.fighter.left2:
+        options.append("Left Quickslot: " + str(player.fighter.left2.owner.owner.name))
+    else:
+        options.append("Left Quickslot: None")
+    options.append("Close menu")
     return menu("Equipment", options, 30)
 
 
