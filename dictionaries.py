@@ -39,7 +39,7 @@ weapon_styles = {
     'bastard_sword': WeaponDamageTypes('slash', 'chop'),
 
     # long swords: two-handed slash, two-handed
-    'long_swords': WeaponDamageTypes('', '')
+    'long_swords': WeaponDamageTypes('thrust', 'slash')
 }
 
 weapons = {
@@ -48,3 +48,25 @@ weapons = {
     'Short Sword': Weapon('small_sword', '15', '10', '12')
 }
 
+# AI Notation:
+# Right-hand attack: R
+# Left-hand attack: L
+# Two-hand attack: T
+# Block: B
+# Dodge: D
+# Wait: W
+# Repeat pattern: +
+# If AI attempts to attack with one-hand when wielding two-handed weapon, consume two one-handed inputs for each two-
+#   handed attack. E.g. if pattern is RLRR+ and creature only has two-handed weapon, pattern is converted to TT+.
+
+BasicAIAttacks = {
+    'def': ['R', 'B', '+'],
+    'dual': ['R', 'L', 'R', 'L', 'D', 'D', '+'],
+    'th': ['T', 'T', 'B', 'B', '+']
+}
+
+AggressiveAIAttacks = {
+    'def': ['R', 'R', 'R', 'R', 'W', '+'],
+    'dual': ['R', 'L', 'R', 'L', 'R', 'L', 'W', '+'],
+    'th': ['T', '+']
+}
