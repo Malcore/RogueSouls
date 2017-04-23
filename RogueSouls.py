@@ -61,7 +61,7 @@ DODGE_TIME = 8
 
 
 class Object:
-    def __init__(self, x, y, char, name, color, blocks=True, always_visible=False, block_sight=True, fighter=None, ai=None, item=None, player=None):
+    def __init__(self, x, y, char, name, color, blocks=True, always_visible=False, block_sight=True, fighter=None, item=None, player=None):
         self.x = x
         self.y = y
         self.char = char
@@ -75,12 +75,6 @@ class Object:
         # let the fighter component know who owns it
         if self.fighter:
             self.fighter.owner = self
-
-        self.ai = ai
-        # let the ai component know who owns it
-        if self.ai:
-            self.ai.owner = self
-            self.ai.build_queue()
 
         self.item = item
         if self.item:
@@ -204,7 +198,7 @@ class Fighter:
                  arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
                  def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0, res_frost=0, res_curse=0,
                  bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1, soul_value=0, wait_time=0,
-                 dodge_frames=DODGE_TIME, in_combat=False, inventory=[], blocking=False, death_func=None):
+                 dodge_frames=DODGE_TIME, inventory=[], blocking=False, death_func=None, ai=None):
         self.vig = vig
         self.att = att
         self.end = end
@@ -250,11 +244,15 @@ class Fighter:
         self.soul_value = soul_value
         self.wait_time = wait_time
         self.dodge_frames = dodge_frames
-        self.in_combat = in_combat
         self.inventory = inventory
         self.action_queue = []
         self.blocking = blocking
         self.death_func = death_func
+        self.ai = ai
+
+        # let the ai component know who owns it
+        if self.ai:
+            self.ai.owner = self
 
         # Beginning of derived statistics
 
@@ -491,20 +489,16 @@ class Fighter:
 
 
 class AI:
-    def __init__(self, ai_type=None):
-        self.ai_type = ai_type
+    def __init__(self, name=None, flag="def", move_set=[]):
+        self.name = name
+        self.flag = flag
+        self.move_set = move_set
 
     def build_queue(self):
-        if self.ai_type is None:
+        if self.name is None:
             return
-        if self.ai_type is 'ConstantAttack':
-            if is_facing(self, player):
-                if distance_to(player) is 0:
-                    self.owner.fighter.action_queue = ['att_right_l', 'att_left_l']
-                else:
-                    self.owner.fighter.action_queue = ['move_p', 'att_right_l', 'att_left_l']
-            else:
-                self.owner.fighter.action_queue = ['face_p', 'move_p', 'att_right_l', 'att_left_l']
+        else:
+            self.move_set = dicts['AI'][self.name][self.flag]
 
 
 #################################

@@ -56,17 +56,24 @@ weapons = {
 # Dodge: D
 # Wait: W
 # Repeat pattern: +
+# Attack Modifier (Heavy): H
+
 # If AI attempts to attack with one-hand when wielding two-handed weapon, consume two one-handed inputs for each two-
 #   handed attack. E.g. if pattern is RLRR+ and creature only has two-handed weapon, pattern is converted to TT+.
+# If an attack modifier is present, the attack changes accordingly. If an attack is being consumed to become a two-
+# handed, it gains all modifiers of the individual attacks, if applicable (each modifier can only be applied once).
+AI = {
+    'basic': {
+        'def': ['R', 'B', '+'],
+        'dual': ['R', 'L', 'R', 'L', 'D', 'D', '+'],
+        'th': ['T', 'T', 'B', 'B', '+']
+    },
 
-BasicAIAttacks = {
-    'def': ['R', 'B', '+'],
-    'dual': ['R', 'L', 'R', 'L', 'D', 'D', '+'],
-    'th': ['T', 'T', 'B', 'B', '+']
+    'aggressive': {
+        'def': ['R', 'R', 'R', 'R', 'W', '+'],
+        'dual': ['R', 'L', 'R', 'L', 'R', 'L', 'W', '+'],
+        'th': ['T', '+']
+    }
 }
 
-AggressiveAIAttacks = {
-    'def': ['R', 'R', 'R', 'R', 'W', '+'],
-    'dual': ['R', 'L', 'R', 'L', 'R', 'L', 'W', '+'],
-    'th': ['T', '+']
-}
+
