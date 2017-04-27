@@ -58,12 +58,28 @@ BLOCK_SPEED = 10
 MOVE_SPEED = 20
 # number of frames to turn clockwise or counterclockwise once
 TURN_SPEED = 10
-# number of frames that a character is invulnerable if dodging
+# number of frames that a character is invulnerable while dodging
 DODGE_TIME = 8
 
-
+########################################################################################################################
+# Major TODOs                                                                                                          #
+########################################################################################################################
+# TODO: add real-time gameplay mode
+# TODO: selection between "Classic, Apprentice, and Expert" modes
+# TODO: magic systems
+# TODO: enemy dictionaries, with simple assembly of creatures by choosing sets of stats, ai, and equipment
+# TODO: overworld map
+# TODO: location sub-map, procedural generation vs. handcrafted
+# TODO: equipment dictionaries
+# TODO: consumable item dictionaries
+# TODO: random-generation of items
+# TODO: equipment prefix/suffix/addon/enchantment/upgrade dictionaries and systems
+# TODO: level-up systems
+# TODO: crafting systems?
+########################################################################################################################
 class Object:
-    def __init__(self, x, y, char, name, color, blocks=True, always_visible=False, block_sight=True, fighter=None, item=None, player=None):
+    def __init__(self, x, y, char, name, color, blocks=True,
+                 always_visible=False, block_sight=True, fighter=None, item=None, player=None):
         self.x = x
         self.y = y
         self.char = char
@@ -165,7 +181,6 @@ class Equipment:
         self.equippable_at = equippable_at
         self.is_equipped = False
 
-
 class Tile:
     # a tile of the map and its properties
     def __init__(self, blocked, block_sight=None):
@@ -190,7 +205,7 @@ class Player:
     def level_up(self):
         self.owner.fighter.level += 1
         self.skillpoints += 1
-        # TODO
+        # TODO: implement level-up system
 
 
 class Fighter:
@@ -275,7 +290,7 @@ class Fighter:
         self.res_curse += 0.2 * self.vig
 
         # Attunement effects
-        # TODO
+        # TODO: attunement stat effects
         self.att_points = 10
 
         # Endurance effects
@@ -294,23 +309,23 @@ class Fighter:
         self.res_curse += 0.2 * self.end
 
         # Strength effects
-        # TODO
+        # TODO: strength stat effects
 
         # Dexterity effects
         # TODO: show effects of dex on dodge frames
         self.dodge_frames += self.dex
 
         # Intelligence effects
-        # TODO
+        # TODO: intelligence stat effects
 
         # Faith effects
-        # TODO
+        # TODO: faith stat effects
 
         # Luck effects
-        # TODO
+        # TODO: luck stat effects
 
         # Will effects
-        # TODO
+        # TODO: will stat effects
 
         # Other statistics
         self.curr_hp = self.hit_points
@@ -319,67 +334,38 @@ class Fighter:
         self.curr_r = right1
         self.curr_l = left2
 
-    def old_handle_attack_move(self, side, type):
-        libtcod.console_wait_for_keypress(True)
-        libtcod.console_wait_for_keypress(True)
-
-        if libtcod.console_is_key_pressed(libtcod.KEY_UP) or libtcod.console_is_key_pressed(libtcod.KEY_KP8):
-            self.attack_handler(side, (0, -1), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_DOWN) or libtcod.console_is_key_pressed(libtcod.KEY_KP2):
-            self.attack_handler(side, (0, 1), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_LEFT) or libtcod.console_is_key_pressed(libtcod.KEY_KP4):
-            self.attack_handler(side, (-1, 0), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT) or libtcod.console_is_key_pressed(libtcod.KEY_KP6):
-            self.attack_handler(side, (1, 0), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_KP7):
-            self.attack_handler(side, (-1, -1), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_KP9):
-            self.attack_handler(side, (1, -1), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_KP1):
-            self.attack_handler(side, (-1, 1), type)
-
-        elif libtcod.console_is_key_pressed(libtcod.KEY_KP3):
-            self.attack_handler(side, (1, 1), type)
-
     def handle_attack_move(self, side, type):
         keypress = False
-        for event in tdl.event.get():
-            if event.type == 'KEYDOWN':
-                user_input = event
-                keypress = True
+        while not keypress:
+            for event in tdl.event.get():
+                if event.type == 'KEYDOWN':
+                    user_input = event
+                    keypress = True
 
-        if not keypress:
-            pass
-
-        if user_input.key == 'UP' or user_input.key == 'TEXT' and user_input.text == '6':
+        if user_input.key == 'UP' or user_input.key == 'TEXT' and user_input.text == '8':
             self.attack_handler(side, (0, -1), type)
 
-        elif user_input.key == 'DOWN' or user_input.key == 'TEXT' and user_input.text == '6':
+        elif user_input.key == 'DOWN' or user_input.key == 'TEXT' and user_input.text == '2':
             self.attack_handler(side, (0, 1), type)
 
-        elif user_input.key == 'LEFT' or user_input.key == 'TEXT' and user_input.text == '6':
+        elif user_input.key == 'LEFT' or user_input.key == 'TEXT' and user_input.text == '4':
             self.attack_handler(side, (-1, 0), type)
 
         elif user_input.key == 'RIGHT' or user_input.key == 'TEXT' and user_input.text == '6':
             self.attack_handler(side, (1, 0), type)
 
-        elif user_input.key == 'TEXT' and user_input.text == '6':
-            self.attack_handler(side, (-1, -1), type)
+        elif user_input.key == 'TEXT':
+            if user_input.text == '7':
+                self.attack_handler(side, (-1, -1), type)
 
-        elif user_input.key == 'TEXT' and user_input.text == '6':
-            self.attack_handler(side, (1, -1), type)
+            elif user_input.text == '9':
+                self.attack_handler(side, (1, -1), type)
 
-        elif user_input.key == 'TEXT' and user_input.text == '6':
-            self.attack_handler(side, (-1, 1), type)
+            elif user_input.text == '1':
+                self.attack_handler(side, (-1, 1), type)
 
-        elif user_input.key == 'TEXT' and user_input.text == '6':
-            self.attack_handler(side, (1, 1), type)
+            elif user_input.text == '3':
+                self.attack_handler(side, (1, 1), type)
 
     def attack_handler(self, side, dir, type):
         if side == "right":
@@ -412,12 +398,12 @@ class Fighter:
         self.wait_time += DODGE_TIME
 
     def parry(self):
-        # TODO
+        # TODO: implement parry system
         self.wait_time += PARRY_SPEED
         return self
 
     def block(self):
-        # TODO
+        # TODO: implement blocking system
         self.wait_time += BLOCK_SPEED
         return self
 
@@ -454,6 +440,7 @@ class Fighter:
             target.death()
 
     def death(self):
+        # TODO: (bug) tile does not appear after removal of creature char, before player action
         if self.death_func:
             func = self.death_func
             func()
@@ -646,8 +633,9 @@ def message(new_msg, color=colors.white):
 def menu(header, options, width):
     if len(options) > 26:
         raise ValueError('Cannot have a menu with more than 26 options.')
+        # TODO: create support for menus with more than 26 options
 
-        # calculate total height for the header (after textwrap) and one line per option
+    # calculate total height for the header (after textwrap) and one line per option
     header_wrapped = textwrap.wrap(header, width)
     header_height = len(header_wrapped)
     height = len(options) + header_height
@@ -673,16 +661,18 @@ def menu(header, options, width):
     x = SCREEN_WIDTH // 2 - width // 2
     y = SCREEN_HEIGHT // 2 - height // 2
     root.blit(window, x, y, width, height, 0, 0, fg_alpha=1.0, bg_alpha=0.7)
+    tdl.flush()
 
     # present the root console to the player and wait for a key-press
-    tdl.flush()
-    key = tdl.event.key_wait()
-    key_char = key.char
-    if key_char == '':
-        key_char = ' '  # placeholder
+    keypress = False
+    while not keypress:
+        for event in tdl.event.get():
+            if event.type == 'KEYDOWN':
+                user_input = event
+                keypress = True
 
     # convert the ASCII code to an index; if it corresponds to an option, return it
-    index = ord(key_char) - ord('a')
+    index = ord(user_input.text) - ord('a')
     if index >= 0 and index < len(options):
         return index
     return None
@@ -717,7 +707,7 @@ def get_equipped_in_slot(char, slot):
     # returns the equipment in a slot, or None if it's empty
     for obj in char.inventory:
         if obj.item.equipment and getattr(char, slot) is not None:
-                        # obj.item.equipment.slot is obj.item.equipment.is_equipped and slot:
+            # obj.item.equipment.slot is obj.item.equipment.is_equipped and slot:
             return obj.item.equipment
     return None
 
@@ -883,44 +873,46 @@ def handle_keys():
         elif user_input.key == 'RIGHT' or user_input.key == 'TEXT' and user_input.text == '6':
             player.move(1, 0)
 
-        elif user_input.key == 'TEXT' and user_input.text == '7':
-            player.move(-1, -1)
+        elif user_input.key == 'TEXT':
+            if user_input.text == '7':
+                player.move(-1, -1)
 
-        elif user_input.key == 'TEXT' and user_input.text == '9':
-            player.move(1, -1)
+            elif user_input.text == '9':
+                player.move(1, -1)
 
-        elif user_input.key == 'TEXT' and user_input.text == '1':
-            player.move(-1, 1)
+            elif user_input.text == '1':
+                player.move(-1, 1)
 
-        elif user_input.key == 'TEXT' and user_input.text == '3':
-            player.move(1, 1)
+            elif user_input.text == '3':
+                player.move(1, 1)
 
-        elif user_input.key == 'TEXT' and user_input.text == 'i':
-            inventory_menu()
+            elif user_input.text == 'i':
+                choice = inventory_menu()
+                if choice:
+                    item = player.fighter.inventory[choice]
+                    player.fighter.equip(item)
 
-        elif user_input.key == 'TEXT' and user_input.text == 'e':
-            equip_or_unequip(equipment_menu())
+            elif user_input.text == 'e':
+                equip_or_unequip(equipment_menu())
 
-        # force quit key?
-        elif user_input.key == 'TEXT' and user_input.text == 'Q':
-            exit()
+            # force quit key?
+            elif user_input.text == 'Q':
+                exit()
 
-        elif user_input.key == 'TEXT' and user_input.text == 'd':
-            drop_menu()
+            elif user_input.text == 'd':
+                drop_menu()
 
-        elif user_input.key == 'TEXT' and user_input.text == ',':
-            player.fighter.handle_attack_move("left", "special")
-            return
+            elif user_input.text == ',':
+                player.fighter.handle_attack_move("left", "special")
 
-        elif user_input.key == 'TEXT' and user_input.text == '.':
-            player.fighter.handle_attack_move("right", "special")
-            return
+            elif user_input.text == '.':
+                player.fighter.handle_attack_move("right", "special")
 
-        elif user_input.key == 'TEXT' and user_input.text == 'k':
-            player.fighter.handle_attack_move("left", "normal")
+            elif user_input.text == 'k':
+                player.fighter.handle_attack_move("left", "normal")
 
-        elif user_input.key == 'TEXT' and user_input.text == 'l3':
-            player.fighter.handle_attack_move("right", "normal")
+            elif user_input.text == 'l':
+                player.fighter.handle_attack_move("right", "normal")
 
 
 def get_names_under_mouse():
@@ -946,7 +938,10 @@ def inventory_menu():
     return index
 
 
+# Indicies: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
 def equip_or_unequip(index):
+    print(index)
+    '''
     if index is not None and index < len(player.fighter.inventory):
         item_obj = player.fighter.inventory[index]
         if item_obj.item.equipment:
@@ -956,6 +951,7 @@ def equip_or_unequip(index):
                         player.fighter.unequip(item_obj.item.equipment)
                     else:
                         player.fighter.equip(item_obj.item.equipment)
+    '''
 
 
 def equipment_menu():
@@ -1065,12 +1061,12 @@ def render_all():
                     # if it's explored
                     if world_map[x][y].explored:
                         if wall:
-                            con.draw_char(x, y, '.', fg=color_dark_wall, bg=None)
+                            con.draw_char(x, y, '#', fg=color_dark_wall, bg=None)
                         else:
                             con.draw_char(x, y, '.', fg=color_dark_ground, bg=None)
                 else:
                     if wall:
-                        con.draw_char(x, y, '.', fg=color_light_wall, bg=None)
+                        con.draw_char(x, y, '#', fg=color_light_wall, bg=None)
                     else:
                         con.draw_char(x, y, '.', fg=color_light_ground, bg=None)
                     # since it's visible, explore it
