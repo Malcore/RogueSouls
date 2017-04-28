@@ -76,7 +76,10 @@ DODGE_TIME = 8
 # TODO: equipment prefix/suffix/addon/enchantment/upgrade dictionaries and systems
 # TODO: level-up systems
 # TODO: crafting systems?
+# TODO: Dark Cloud style base-building?
 ########################################################################################################################
+
+
 class Object:
     def __init__(self, x, y, char, name, color, blocks=True,
                  always_visible=False, block_sight=True, fighter=None, item=None, player=None):
@@ -447,12 +450,17 @@ class Fighter:
         else:
             basic_death(self)
 
-    def equip(self, item):
-        success = False
+    # Indicies: head-0, chest-1, arms-2, legs-3, neck-4, right1-5, left1-6, ring1-7, ring2-8, right2-9, left2-10
+    def equip_handler(self, item):
         options = ['Head', 'Chest', 'Arms', 'Legs', 'Neck', 'Right Hand', 'Left Hand', 'Right Ring', 'Left Ring',
                    'Right Hand Quick Slot', 'Left Hand Quick Slot']
         choice = menu("Equip in which slot?", options, SCREEN_WIDTH)
-        if choice is None or choice > len(options):
+        self.equip(item, choice)
+        print(choice)
+
+    def equip(self, item, choice):
+        success = False
+        if choice is None or choice > 10:
             return
         if choice is 0 and item.equippable_at is 'head':
             self.head = item
@@ -500,7 +508,7 @@ class Fighter:
             success = True
         if success:
             item.is_equipped = True
-            message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
+            message('Equipped ' + item.owner.owner.name + ' to ' + item.equippable_at + '.', colors.light_green)
 
     # unequip object and show a message about it
     def unequip(self, item):
@@ -510,6 +518,20 @@ class Fighter:
         setattr(self, str(item.equipped_at), None)
         item.is_equipped = False
         item.equipped_at = None
+
+    def equip_or_unequip(self, item):
+        if item.is_equipped:
+            self.equip(item)
+        else:
+            self.unequip(item)
+
+    def equip_to_slot(self, index):
+        choice = inventory_menu()
+        if choice is not None and choice < len(self.inventory):
+            item = player.fighter.inventory[choice].item.equipment
+            print(index)
+            print(item.equippable_at)
+            self.equip(item, index)
 
 
 class AI:
@@ -888,12 +910,12 @@ def handle_keys():
 
             elif user_input.text == 'i':
                 choice = inventory_menu()
-                if choice:
+                if choice and choice < len(player.fighter.inventory):
                     item = player.fighter.inventory[choice]
                     player.fighter.equip(item)
 
             elif user_input.text == 'e':
-                equip_or_unequip(equipment_menu())
+                player.fighter.equip_to_slot(equipment_menu())
 
             # force quit key?
             elif user_input.text == 'Q':
@@ -938,7 +960,7 @@ def inventory_menu():
     return index
 
 
-# Indicies: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
+
 def equip_or_unequip(index):
     print(index)
     '''
@@ -977,14 +999,6 @@ def equipment_menu():
         options.append("Neck: " + str(player.fighter.neck.owner.owner.name))
     else:
         options.append("Necks: None")
-    if player.fighter.ring1:
-        options.append("Right Ring: " + str(player.fighter.ring1.owner.owner.name))
-    else:
-        options.append("Right Ring: None")
-    if player.fighter.ring2:
-        options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name))
-    else:
-        options.append("Left Ring: None")
     if player.fighter.right1:
         options.append("Right Hand: " + str(player.fighter.right1.owner.owner.name))
     else:
@@ -993,6 +1007,15 @@ def equipment_menu():
         options.append("Left Hand: " + str(player.fighter.left1.owner.owner.name))
     else:
         options.append("Left Hand: None")
+    if player.fighter.ring1:
+        options.append("Right Ring: " + str(player.fighter.ring1.owner.owner.name))
+    else:
+        options.append("Right Ring: None")
+    if player.fighter.ring2:
+        options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name))
+    else:
+        options.append("Left Ring: None")
+
     if player.fighter.right2:
         options.append("Right Quickslot: " + str(player.fighter.right2.owner.owner.name))
     else:
@@ -1169,7 +1192,7 @@ def new_game():
     sword = Object(0, 0, '-', name="Broken Sword", color=colors.sky, block_sight=False, item=item_comp,
                    always_visible=True)
     player.fighter.inventory.append(sword)
-    player.fighter.equip(equipment_component)
+    player.fighter.equip_handler(equipment_component)
     play_game()
 
 
@@ -1206,7 +1229,7 @@ def quit_game():
 
 
 #############################################
-# Initialization & Main Loop                #
+# Initialization                            #
 #############################################
 tdl.set_font('dundalk12x12_gs_tc.png', greyscale=True, altLayout=True)
 tdl.setFPS(LIMIT_FPS)
