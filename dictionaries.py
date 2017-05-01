@@ -8,6 +8,7 @@ SMAPH = 20
 SkillNode = namedtuple('SkillNode', ['description', 'effect', 'taken'])
 WeaponDamageTypes = namedtuple('typeName', ['l_att', 'h_att'])
 Weapon = namedtuple('weaponName', ['wep_type', 'damage', 'l_time', 'h_time'])
+Fix = namedtuple('fix', ['bonus', 'stat', 'special_text', 'rarity'])
 
 items = []
 
@@ -46,6 +47,40 @@ weapons = {
     'Unarmed': Weapon('fist', '4', '7', '12'),
     'Broken Sword': Weapon('small_sword', '6', '10', '10'),
     'Short Sword': Weapon('small_sword', '15', '10', '12')
+}
+
+weapon_prefix = {
+    '': '',
+    'Hardened': Fix('+1', 'dmg', '', 'mag'),
+    'Battered': Fix('-1', 'dmg', '', 'low'),
+    'Tiered': Fix()
+}
+
+weapon_affix = {
+    '': '',
+    'Of the Moon': Fix('', '', 'Upon each successful hit, add an amount of SP to your pool equal to the damage the hit'
+                               'dealt.', 'uni'),
+    'of Storms': Fix(['+2', '-1'], ['int', 'vig'], '', 'rare')
+}
+
+armor_prefix = {
+
+}
+
+armor_affix = {
+
+}
+
+acc_prefix = {
+
+}
+
+acc_affix = {
+
+}
+
+consumables = {
+
 }
 
 # AI Notation:
