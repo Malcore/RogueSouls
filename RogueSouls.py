@@ -76,10 +76,7 @@ DODGE_TIME = 8
 # TODO: equipment prefix/suffix/addon/enchantment/upgrade dictionaries and systems
 # TODO: level-up systems
 # TODO: crafting systems?
-# TODO: decide static, dynamic, or randomized damage system
 ########################################################################################################################
-
-
 class Object:
     def __init__(self, x, y, char, name, color, blocks=True,
                  always_visible=False, block_sight=True, fighter=None, item=None, player=None):
@@ -501,9 +498,9 @@ class Fighter:
             self.left2 = item
             item.equipped_at = 'left2'
             success = True
-            if success:
-                item.is_equipped = True
-                message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
+        if success:
+            item.is_equipped = True
+            message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
 
     # unequip object and show a message about it
     def unequip(self, item):
@@ -702,18 +699,6 @@ def render_bar(x, y, total_width, name, value, maximum, bar_color, back_color):
     x_centered = x + (total_width - len(text)) // 2
     panel.draw_str(x_centered, y, text, fg=colors.white, bg=None)
 
-
-def item_color(item):
-    color = colors.white
-    if item.rarity is 'low':
-        color = colors.gray
-    elif item.rarity is 'mag':
-        color = colors.azure
-    elif item.rarity is 'rare':
-        color = colors.light_yellow
-    elif item.rarity is 'uni':
-        color = colors.gold
-    return color
 
 ############################################
 # player-related functions
@@ -1215,7 +1200,6 @@ def play_game():
                     # obj.fighter.ai.take_turn()
                     pass
     print('error')
-
 
 def quit_game():
     sys.exit()
