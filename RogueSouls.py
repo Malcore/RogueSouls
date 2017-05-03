@@ -60,7 +60,6 @@ MOVE_SPEED = 20
 TURN_SPEED = 10
 # number of frames that a character is invulnerable while dodging
 DODGE_TIME = 8
-
 ########################################################################################################################
 # Major TODOs                                                                                                          #
 ########################################################################################################################
@@ -76,7 +75,10 @@ DODGE_TIME = 8
 # TODO: equipment prefix/suffix/addon/enchantment/upgrade dictionaries and systems
 # TODO: level-up systems
 # TODO: crafting systems?
+# TODO: Dark Cloud style world building?
 ########################################################################################################################
+
+
 class Object:
     def __init__(self, x, y, char, name, color, blocks=True,
                  always_visible=False, block_sight=True, fighter=None, item=None, player=None):
@@ -888,9 +890,10 @@ def handle_keys():
 
             elif user_input.text == 'i':
                 choice = inventory_menu()
-                if choice:
+                print(choice)
+                if choice is not None:
                     item = player.fighter.inventory[choice]
-                    player.fighter.equip(item)
+                    player.fighter.equip(item.item.equipment)
 
             elif user_input.text == 'e':
                 equip_or_unequip(equipment_menu())
@@ -941,6 +944,8 @@ def inventory_menu():
 # Indicies: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
 def equip_or_unequip(index):
     print(index)
+    item = player.fighter.inventory[inventory_menu()]
+    #player.fighter.equip(item)
     '''
     if index is not None and index < len(player.fighter.inventory):
         item_obj = player.fighter.inventory[index]
@@ -1070,7 +1075,7 @@ def render_all():
                     else:
                         con.draw_char(x, y, '.', fg=color_light_ground, bg=None)
                     # since it's visible, explore it
-                        world_map[x][y].explored = True
+                    world_map[x][y].explored = True
 
     # draw all objects in the list
     for obj in objects:
@@ -1183,10 +1188,6 @@ def play_game():
         # draw all objects in the list
         render_all()
         tdl.flush()
-
-        # erase all objects at their old locations, before they move
-        for obj in objects:
-            obj.clear()
 
         # handle keys and exit game if needed
         player_action = handle_keys()

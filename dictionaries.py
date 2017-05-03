@@ -51,32 +51,32 @@ weapons = {
 
 weapon_prefix = {
     '': '',
-    'Hardened': Fix('+1', 'dmg', '', 'mag'),
-    'Battered': Fix('-1', 'dmg', '', 'low'),
-    'Tiered': Fix()
+    'Hardened': Fix('+1', 'dmg', '', 'superior'),
+    'Battered': Fix('-1', 'dmg', '', 'lq'),
+    'Tiered': Fix('', '', '', 'superior')
 }
 
 weapon_affix = {
     '': '',
-    'Of the Moon': Fix('', '', 'Upon each successful hit, add an amount of SP to your pool equal to the damage the hit'
-                               'dealt.', 'uni'),
+    'of the Moon': Fix('', '', 'Upon each successful hit, add an amount of SP to your pool equal to the damage the hit'
+                               'dealt.', 'unique'),
     'of Storms': Fix(['+2', '-1'], ['int', 'vig'], '', 'rare')
 }
 
 armor_prefix = {
-
+    '': ''
 }
 
 armor_affix = {
-
+    '': ''
 }
 
 acc_prefix = {
-
+    '': ''
 }
 
 acc_affix = {
-
+    '': ''
 }
 
 consumables = {
