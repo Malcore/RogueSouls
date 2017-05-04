@@ -1,4 +1,3 @@
-# import libtcodpy as libtcod
 import tdl
 import colors
 import random
@@ -16,7 +15,7 @@ SCREEN_HEIGHT = 50
 
 # size of the map
 MAP_WIDTH = 100
-MAP_HEIGHT = 55
+MAP_HEIGHT = 50
 
 # color constants
 color_dark_wall = colors.darker_gray
@@ -183,9 +182,10 @@ class Equipment:
         self.equippable_at = equippable_at
         self.is_equipped = False
 
+
 class Tile:
     # a tile of the map and its properties
-    def __init__(self, blocked, block_sight=None):
+    def __init__(self, blocked, block_sight=None, char=None):
         self.blocked = blocked
 
         # all tiles start unexplored
@@ -195,6 +195,8 @@ class Tile:
         if blocked is None:
             block_sight = blocked
         self.block_sight = block_sight
+
+        self.char = char
 
 
 class Player:
@@ -674,8 +676,11 @@ def menu(header, options, width):
                 keypress = True
 
     # convert the ASCII code to an index; if it corresponds to an option, return it
-    index = ord(user_input.text) - ord('a')
-    if index >= 0 and index < len(options):
+    if user_input.text:
+        index = ord(user_input.text) - ord('a')
+    else:
+        index = -1
+    if 0 <= index < len(options):
         return index
     return None
 
@@ -820,6 +825,43 @@ def make_world_map():
     world_map[30][22].block_sight = True
     world_map[50][22].blocked = True
     world_map[50][22].block_sight = True
+
+    '''
+    world_map[1][1] = (player spawn)
+    world_map[1][2] = (mountain)
+    world_map[1][3] = (mountain)
+    world_map[1][4] = (mountain)
+    world_map[1][5] = (path)
+    world_map[1][6] = (mountain)
+    world_map[1][7] = (mountain)
+    world_map[2][1] = (path)
+    world_map[2][2] = (mountain)
+    world_map[2][3] = (city)
+    world_map[2][4] = (path)
+    world_map[2][5] = (mountain)
+    world_map[2][6] = (path)
+    world_map[2][7] = (mountain)
+    world_map[3][1] = (path)
+    world_map[3][2] = (mountain)
+    world_map[3][3] = (mountain)
+    world_map[3][4] = (mountain)
+    world_map[3][5] = (mountain)
+    world_map[3][6] = (dungeon/ruins/castle)
+    world_map[3][7] = (mountain)
+    world_map[4][1] = (plains)
+    world_map[4][2] = (path)
+    world_map[4][3] = (path)
+    world_map[4][4] = (path)
+    world_map[4][5] = (path)
+    world_map[4][6] = (mountain)
+    world_map[4][7] = (mountain)
+    world_map[5][1] = (plains)
+    world_map[5][2] = (plains)
+    world_map[5][3] = (mountain)
+    world_map[5][4] = (mountain)
+    world_map[5][5] = (mountain)
+    world_map[5][6] = (mountain)
+    '''
 
 
 ############################################
@@ -1106,7 +1148,7 @@ def render_all():
 
 
 def is_visible_tile(x, y):
-    global map
+    global world_map
 
     if x >= MAP_WIDTH or x < 0:
         return False
@@ -1200,7 +1242,7 @@ def play_game():
                 if obj.fighter.ai:
                     # obj.fighter.ai.take_turn()
                     pass
-    print('error')
+
 
 def quit_game():
     sys.exit()
