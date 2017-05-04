@@ -40,6 +40,7 @@ LEVEL_UP_FACTOR = 30
 # fov constants
 FOV_ALGO = 'BASIC'
 FOV_LIGHT_WALLS = True
+WORLD_FOV_RAD = 3
 TORCH_RADIUS = 10
 
 # combat variables
@@ -185,7 +186,7 @@ class Equipment:
 
 class Tile:
     # a tile of the map and its properties
-    def __init__(self, blocked, block_sight=None, char=None):
+    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None):
         self.blocked = blocked
 
         # all tiles start unexplored
@@ -197,6 +198,50 @@ class Tile:
         self.block_sight = block_sight
 
         self.char = char
+        self.vis_color = vis_color
+        self.fog_color = fog_color
+
+    def city(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = 'o'
+        self.vis_color = colors.yellow
+        self.fog_color = colors.dark_yellow
+
+    def dungeon(self):
+        self.blocked = False
+        self.block_sight = True
+        self.char = '*'
+        self.vis_color = colors.darker_sepia
+        self.fog_color = colors.darkest_sepia
+
+    def fog(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = chr(178)
+        self.vis_color = colors.dark_crimson
+        self.fog_color = colors.darker_crimson
+
+    def mountain(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = '^'
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
+
+    def path(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '.'
+        self.vis_color = colors.darker_amber
+        self.fog_color = colors.darkest_amber
+
+    def plains(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = chr(247)
+        self.vis_color = colors.light_chartreuse
+        self.fog_color = colors.chartreuse
 
 
 class Player:
@@ -821,47 +866,62 @@ def make_world_map():
                  for y in range(MAP_HEIGHT)]
                  for x in range(MAP_WIDTH)]
 
-    world_map[30][22].blocked = True
-    world_map[30][22].block_sight = True
-    world_map[50][22].blocked = True
-    world_map[50][22].block_sight = True
-
-    '''
-    world_map[1][1] = (player spawn)
-    world_map[1][2] = (mountain)
-    world_map[1][3] = (mountain)
-    world_map[1][4] = (mountain)
-    world_map[1][5] = (path)
-    world_map[1][6] = (mountain)
-    world_map[1][7] = (mountain)
-    world_map[2][1] = (path)
-    world_map[2][2] = (mountain)
-    world_map[2][3] = (city)
-    world_map[2][4] = (path)
-    world_map[2][5] = (mountain)
-    world_map[2][6] = (path)
-    world_map[2][7] = (mountain)
-    world_map[3][1] = (path)
-    world_map[3][2] = (mountain)
-    world_map[3][3] = (mountain)
-    world_map[3][4] = (mountain)
-    world_map[3][5] = (mountain)
-    world_map[3][6] = (dungeon/ruins/castle)
-    world_map[3][7] = (mountain)
-    world_map[4][1] = (plains)
-    world_map[4][2] = (path)
-    world_map[4][3] = (path)
-    world_map[4][4] = (path)
-    world_map[4][5] = (path)
-    world_map[4][6] = (mountain)
-    world_map[4][7] = (mountain)
-    world_map[5][1] = (plains)
-    world_map[5][2] = (plains)
-    world_map[5][3] = (mountain)
-    world_map[5][4] = (mountain)
-    world_map[5][5] = (mountain)
-    world_map[5][6] = (mountain)
-    '''
+    world_map[0][0].fog()
+    world_map[0][1].fog()
+    world_map[0][2].fog()
+    world_map[0][3].fog()
+    world_map[0][4].fog()
+    world_map[0][5].fog()
+    world_map[0][6].fog()
+    world_map[1][0].fog()
+    world_map[1][1].path()
+    world_map[1][2].path()
+    world_map[1][3].path()
+    world_map[1][4].plains()
+    world_map[1][5].plains()
+    world_map[1][6].fog()
+    world_map[2][0].fog()
+    world_map[2][1].mountain()
+    world_map[2][2].mountain()
+    world_map[2][3].mountain()
+    world_map[2][4].path()
+    world_map[2][5].plains()
+    world_map[2][6].fog()
+    world_map[3][0].fog()
+    world_map[3][1].mountain()
+    world_map[3][2].city()
+    world_map[3][3].mountain()
+    world_map[3][4].path()
+    world_map[3][5].mountain()
+    world_map[3][6].fog()
+    world_map[4][0].fog()
+    world_map[4][1].mountain()
+    world_map[4][2].path()
+    world_map[4][3].mountain()
+    world_map[4][4].path()
+    world_map[4][5].mountain()
+    world_map[4][6].fog()
+    world_map[5][0].fog()
+    world_map[5][1].path()
+    world_map[5][2].mountain()
+    world_map[5][3].mountain()
+    world_map[5][4].path()
+    world_map[5][5].mountain()
+    world_map[5][6].fog()
+    world_map[6][0].fog()
+    world_map[6][1].mountain()
+    world_map[6][2].path()
+    world_map[6][3].dungeon()
+    world_map[6][4].mountain()
+    world_map[6][5].mountain()
+    world_map[6][6].fog()
+    world_map[7][0].fog()
+    world_map[7][1].mountain()
+    world_map[7][2].mountain()
+    world_map[7][3].mountain()
+    world_map[7][4].mountain()
+    world_map[7][5].fog()
+    world_map[7][6].fog()
 
 
 ############################################
@@ -893,7 +953,7 @@ def handle_keys():
             print(choice)
             double_check = menu('Are you sure?', ['No', 'Yes'], 24)
             if double_check:
-                return 'exit'
+                exit()
             else:
                 return
         elif choice is 1:
@@ -1096,26 +1156,19 @@ def render_all():
 
     if fov_recompute:
         fov_recompute = False
-        visible_tiles = tdl.map.quickFOV(player.x, player.y, is_visible_tile, fov=FOV_ALGO, lightWalls=FOV_LIGHT_WALLS)
+        visible_tiles = tdl.map.quickFOV(player.x, player.y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
 
         # go through all tiles, and set their background color according to the FOV
         for y in range(MAP_HEIGHT):
             for x in range(MAP_WIDTH):
                 visible = (x, y) in visible_tiles
-                wall = world_map[x][y].block_sight
                 if not visible:
-                    # if it's not visible right now, the player can only see it
-                    # if it's explored
+                    # if it's not visible right now, the player can only see it if it's explored
                     if world_map[x][y].explored:
-                        if wall:
-                            con.draw_char(x, y, '#', fg=color_dark_wall, bg=None)
-                        else:
-                            con.draw_char(x, y, '.', fg=color_dark_ground, bg=None)
+                        # print(x, y)
+                        con.draw_char(x, y, world_map[x][y].char, world_map[x][y].fog_color, bg=None)
                 else:
-                    if wall:
-                        con.draw_char(x, y, '#', fg=color_light_wall, bg=None)
-                    else:
-                        con.draw_char(x, y, '.', fg=color_light_ground, bg=None)
+                    con.draw_char(x, y, world_map[x][y].char, world_map[x][y].vis_color, bg=None)
                     # since it's visible, explore it
                     world_map[x][y].explored = True
 
@@ -1193,13 +1246,13 @@ def new_game():
     # first create the player out of its components
     player_comp = Player()
     fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 15)
-    player = Object(0, 0, '@', "Player", colors.gray, fighter=fighter_comp, player=player_comp)
+    player = Object(1, 1, '@', "Player", colors.gray, fighter=fighter_comp, player=player_comp)
     objects.append(player)
 
-    ai_comp = AI('ConstantAttack')
-    enemy_fighter_comp = Fighter(1, 1, 1, 1, 1, 1, 1, 1, 1, ai=ai_comp)
-    enemy = Object(15, 15, 'T', "Test Enemy", colors.dark_red, fighter=enemy_fighter_comp)
-    objects.append(enemy)
+    #ai_comp = AI('ConstantAttack')
+    #enemy_fighter_comp = Fighter(1, 1, 1, 1, 1, 1, 1, 1, 1, ai=ai_comp)
+    #enemy = Object(0, 0, 'T', "Test Enemy", colors.dark_red, fighter=enemy_fighter_comp)
+    #objects.append(enemy)
 
     # generate world map (at this point it's not drawn to the screen)
     make_world_map()
@@ -1251,7 +1304,7 @@ def quit_game():
 #############################################
 # Initialization & Main Loop                #
 #############################################
-tdl.set_font('dundalk12x12_gs_tc.png', greyscale=True, altLayout=True)
+tdl.set_font('terminal12x12_gs_ro.png', greyscale=True, altLayout=False)
 tdl.setFPS(LIMIT_FPS)
 root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="RogueSouls", fullscreen=False)
 con = tdl.Console(MAP_WIDTH, MAP_HEIGHT)
