@@ -184,6 +184,8 @@ class Equipment:
         self.is_equipped = False
 
 
+# TODO: somehow link area maps to locations on world map, such as cities and dungeons
+# TODO: find method to store location maps (matrix with Tile types defined, like world map?)
 class Tile:
     # a tile of the map and its properties
     def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None):
@@ -1018,6 +1020,10 @@ def handle_keys():
 
             elif user_input.text == 'l':
                 player.fighter.handle_attack_move("right", "normal")
+            elif user_input.text == '>':
+                change_location()
+            else:
+                print(user_input.text)
 
 
 def get_names_under_mouse():
@@ -1120,6 +1126,29 @@ def skill_menu():
 
 def drop_menu():
     return
+
+
+# TODO: update game_state var to accurately represent where player is currently at (menu, world map, city, etc)
+def change_location():
+    global game_state
+    if game_state == 'dungeon':
+        # go to next floor
+        next_floor()
+    elif game_state == 'world':
+        enter_location(player.x, player.y)
+
+
+def next_floor():
+    return
+
+
+def enter_location(x, y):
+    if world_map[x][y].char == 'o':
+        print('You enter the city...')
+        pass
+    elif world_map[x][y] == '*':
+        print('You enter the dungeon...')
+        pass
 
 
 ############################################
