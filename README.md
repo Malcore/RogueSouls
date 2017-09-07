@@ -1,6 +1,6 @@
 # 'RogueSouls'
- A roguelike written in Python, with libtcod library functions usedd extensively.
- Heavily influenced by the Dark Souls video game series by FROMSOFT, 'RogueSouls' is a roguelike that attempts to mimic the extremely penalizing combat of the Souls series while still keeping true to the base systems of Rogue and similar games.
+ A roguelike written in Python, with libtcod and tdl library functions used extensively.
+ Heavily influenced by the Dark Souls video game series by FROMSOFT, 'RogueSouls' is a roguelike that attempts to mimic the extremely penalizing combat of the Souls series while still keeping true to the base systems of the roguelike genre.
 
  Currently, the game has the bare minimum of functions. Tasks to be done include:
  
@@ -10,9 +10,9 @@
  
  Enemy AI
  
- Overworld map (hardcoded)
+ Overworld map (hardcoded, e.g. not procedurally generated)
  
- Locale maps (generated)
+ Locale maps (perhaps procedurally generated)
  
  Story writing
  
