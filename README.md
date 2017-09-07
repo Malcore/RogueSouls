@@ -1,21 +1,4 @@
-# 'RogueSouls'
- A roguelike written in Python, with libtcod and tdl library functions used extensively.
- Heavily influenced by the Dark Souls video game series by FROMSOFT, 'RogueSouls' is a roguelike that attempts to mimic the extremely penalizing combat of the Souls series while still keeping true to the base systems of the roguelike genre.
-
- Currently, the game has the bare minimum of functions. Tasks to be done include:
+# Roguelike Developments
+ While I originally planned to develop a simple roguelike inspired by the Dark Souls video game, I am currently going to focus on developing abstract and versatile systems that can then be used in a release. Currently, I am working on translating any systems I find interesting from tabletop roleplaying games to roguelike form. This should provide a solid base to create a finished product that I can happily release.
  
- Combat UI and functions
- 
- Inventory and Equipment
- 
- Enemy AI
- 
- Overworld map (hardcoded, e.g. not procedurally generated)
- 
- Locale maps (perhaps procedurally generated)
- 
- Story writing
- 
- Quest systems
- 
- And more I can't think of right now
+ *Finished systems or modules will be listed below.*
