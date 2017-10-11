@@ -42,7 +42,7 @@ class Object:
                 if self.player:
                     fov_recompute = True
                 return
-        if not rs.is_blocked(self.x + dx, self.y + dy):
+        if not rsu.is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
         if self.player:

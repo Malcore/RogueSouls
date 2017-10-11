@@ -3,6 +3,7 @@ import tdl
 import colors
 
 import RogueSoulsGlobals as gbl
+import RogueSoulsUtils as rsu
 import RogueSouls as rs
 
 
@@ -167,15 +168,15 @@ class Fighter:
 
     def attack_handler(self, side, dir, type):
         if side == "right":
-            wep = rs.get_equipped_in_slot(self, "right1")
+            wep = rsu.get_equipped_in_slot(self, "right1")
         else:
-            wep = rs.get_equipped_in_slot(self, "left1")
+            wep = rsu.get_equipped_in_slot(self, "left1")
         if wep is None:
             wep_name = "Unarmed"
         else:
             wep_name = wep.owner.owner.name
-        wep_dict = rs.get_wep_dict(wep_name)
-        dmg_type_dict = rs.get_style_from_dict(wep_dict[1][0])
+        wep_dict = rsu.get_wep_dict(wep_name)
+        dmg_type_dict = rsu.get_style_from_dict(wep_dict[1][0])
         if type == "normal":
             speed = wep_dict[1][2]
         else:
@@ -216,25 +217,25 @@ class Fighter:
         died = False
         eff_list = []
         if dmg_type == "slash" or dmg_type == "blunt" or dmg_type == "pierce":
-            died = rs.deal_phys_dmg(target, type, dmg, dmg_type)
+            died = rsu.deal_phys_dmg(target, type, dmg, dmg_type)
         if dmg_type == "mag":
-            died = rs.deal_mag_dmg(target, type)
+            died = rsu.deal_mag_dmg(target, type)
         if dmg_type == "fire":
-            died = rs.deal_fire_dmg(target, type)
+            died = rsu.deal_fire_dmg(target, type)
         if dmg_type == "lightn":
-            died = rs.deal_lightn_dmg(target, type)
+            died = rsu.deal_lightn_dmg(target, type)
         if dmg_type == "dark":
-            died = rs.deal_dark_dmg(target, type)
+            died = rsu.deal_dark_dmg(target, type)
         if "bleed" in eff_list:
-            rs.add_bleed(target, self.curr_r)
+            rsu.add_bleed(target, self.curr_r)
         if "poison" in eff_list:
-            rs.add_poison(target, self.curr_r)
+            rsu.add_poison(target, self.curr_r)
         if "frost" in eff_list:
-            rs.add_frost(target, self.curr_r)
+            rsu.add_frost(target, self.curr_r)
         if "curse" in eff_list:
-            rs.add_curse(target, self.curr_r)
+            rsu.add_curse(target, self.curr_r)
         if died:
-            rs.message(str(target.owner.name) + "has died!")
+            rsu.message(str(target.owner.name) + "has died!")
             target.death()
 
     def death(self):
@@ -243,13 +244,13 @@ class Fighter:
             func = self.death_func
             func()
         else:
-            rs.basic_death(self)
+            rsu.basic_death(self)
 
     def equip(self, item):
         success = False
         options = ['Head', 'Chest', 'Arms', 'Legs', 'Neck', 'Right Hand', 'Left Hand', 'Right Ring', 'Left Ring',
                    'Right Hand Quick Slot', 'Left Hand Quick Slot']
-        choice = rs.menu("Equip in which slot?", options, gbl.SCREEN_WIDTH)
+        choice = rsu.menu("Equip in which slot?", options, gbl.SCREEN_WIDTH)
         if choice is None or choice > len(options):
             return
         if choice is 0 and item.equippable_at is 'head':
@@ -298,13 +299,13 @@ class Fighter:
             success = True
         if success:
             item.is_equipped = True
-            rs.message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
+            rsu.message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
 
     # unequip object and show a message about it
     def unequip(self, item):
         if not item.is_equipped:
             return
-        rs.message('Unequipped ' + item.owner.owner.name + ' from ' + item.slot + '.', colors.light_green)
+        rsu.message('Unequipped ' + item.owner.owner.name + ' from ' + item.slot + '.', colors.light_green)
         setattr(self, str(item.equipped_at), None)
         item.is_equipped = False
         item.equipped_at = None

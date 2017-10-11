@@ -1355,6 +1355,18 @@ def is_visible_tile(x, y):
 
 
 ############################################
+# real-time functions
+############################################
+def update_queue():
+    # for each fighter in objects:
+    #   for each action in fighter.action_queue:
+    #       action.timer -= 1
+    #       if action.timer is 0:
+    #           action.effect()
+    return
+
+
+############################################
 # intro screen functions
 ############################################
 def main_menu():
