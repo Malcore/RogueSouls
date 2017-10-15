@@ -782,6 +782,16 @@ def render_bar(x, y, total_width, name, value, maximum, bar_color, back_color):
     panel.draw_str(x_centered, y, text, fg=colors.white, bg=None)
 
 
+def change_screen():
+    window = tdl.Console(SCREEN_HEIGHT, SCREEN_WIDTH)
+
+    # blit the contents of "window" to the root console
+    x = 0
+    y = 0
+    root.blit(window, x, y, 0, 0, SCREEN_HEIGHT - 1, SCREEN_WIDTH - 1, fg_alpha=1.0, bg_alpha=0.7)
+    tdl.flush()
+
+
 ############################################
 # player-related functions
 ############################################
@@ -1159,7 +1169,7 @@ def inventory_menu():
     return index
 
 
-# Indicies: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
+# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
 def equip_or_unequip(index):
     print(index)
     item = player.fighter.inventory[inventory_menu()]
@@ -1241,11 +1251,12 @@ def drop_menu():
 # TODO: update game_state var to accurately represent where player is currently at (menu, world map, city, etc)
 def change_location():
     global game_state
-    if game_state == 'dungeon':
-        # go to next floor
-        next_floor()
-    elif game_state == 'world':
-        enter_location(player.x, player.y)
+    #if game_state == 'dungeon':
+    # go to next floor
+        #next_floor()
+    #elif game_state == 'world':
+    enter_location(player.x, player.y)
+    change_screen()
 
 
 def next_floor():
@@ -1253,12 +1264,10 @@ def next_floor():
 
 
 def enter_location(x, y):
-    if world_map[x][y].char == 'o':
-        print('You enter the city...')
-        pass
-    elif world_map[x][y] == '*':
-        print('You enter the dungeon...')
-        pass
+    if world_map[x][y].char is 'o':
+        message('You enter the city...', colors.gold)
+    elif world_map[x][y].char is '*':
+        message('You enter the dungeon...', colors.gold)
 
 
 ############################################
@@ -1420,7 +1429,7 @@ def new_game():
     sword = Object(0, 0, '-', name="Broken Sword", color=colors.sky, block_sight=False, item=item_comp,
                    always_visible=True)
     player.fighter.inventory.append(sword)
-    player.fighter.equip(equipment_component)
+    # player.fighter.equip(equipment_component)
     play_game()
 
 
