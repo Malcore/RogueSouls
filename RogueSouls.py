@@ -15,7 +15,7 @@ SCREEN_HEIGHT = 50
 
 # size of the map
 MAP_WIDTH = 100
-MAP_HEIGHT = 50
+MAP_HEIGHT = 38
 
 # color constants
 color_dark_wall = colors.darker_gray
@@ -188,7 +188,7 @@ class Equipment:
 # TODO: find method to store location maps (matrix with Tile types defined, like world map?)
 class Tile:
     # a tile of the map and its properties
-    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None):
+    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, label=None):
         self.blocked = blocked
 
         # all tiles start unexplored
@@ -202,6 +202,7 @@ class Tile:
         self.char = char
         self.vis_color = vis_color
         self.fog_color = fog_color
+        self.label = label
 
     def city(self):
         self.blocked = False
@@ -209,6 +210,7 @@ class Tile:
         self.char = 'o'
         self.vis_color = colors.yellow
         self.fog_color = colors.dark_yellow
+        self.label = "city"
 
     def dungeon(self):
         self.blocked = False
@@ -216,6 +218,7 @@ class Tile:
         self.char = '*'
         self.vis_color = colors.darker_sepia
         self.fog_color = colors.darkest_sepia
+        self.label = "dungeon"
 
     def fog(self):
         self.blocked = True
@@ -223,6 +226,7 @@ class Tile:
         self.char = chr(178)
         self.vis_color = colors.dark_crimson
         self.fog_color = colors.darker_crimson
+        self.label = "fog"
 
     def mountain(self):
         self.blocked = True
@@ -230,6 +234,7 @@ class Tile:
         self.char = '^'
         self.vis_color = colors.gray
         self.fog_color = colors.dark_gray
+        self.label = "mountain"
 
     def path(self):
         self.blocked = False
@@ -237,6 +242,15 @@ class Tile:
         self.char = '.'
         self.vis_color = colors.darker_amber
         self.fog_color = colors.darkest_amber
+        self.label = "path"
+
+    def entry(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '.'
+        self.vis_color = colors.darker_amber
+        self.fog_color = colors.darkest_amber
+        self.label = "entry"
 
     def plains(self):
         self.blocked = False
@@ -244,6 +258,7 @@ class Tile:
         self.char = chr(240)
         self.vis_color = colors.light_chartreuse
         self.fog_color = colors.chartreuse
+        self.label = "plains"
 
     def water(self):
         self.blocked = False
@@ -251,6 +266,7 @@ class Tile:
         self.char = chr(247)
         self.vis_color = colors.blue
         self.fog_color = colors.dark_blue
+        self.label = "water"
 
     def swamp(self):
         self.blocked = False
@@ -258,6 +274,7 @@ class Tile:
         self.char = chr(59)
         self.vis_color = colors.darker_gray
         self.fog_color = colors.darkest_gray
+        self.label = "swamp"
 
     def desert(self):
         self.blocked = False
@@ -265,6 +282,7 @@ class Tile:
         self.char = chr(247)
         self.vis_color = colors.yellow
         self.fog_color = colors.desaturated_yellow
+        self.label = "desert"
 
     def forest(self):
         self.blocked = False
@@ -272,6 +290,7 @@ class Tile:
         self.char = chr(209)
         self.vis_color = colors.dark_green
         self.fog_color = colors.darker_green
+        self.label = "forest"
 
 
 class Player:
@@ -782,16 +801,6 @@ def render_bar(x, y, total_width, name, value, maximum, bar_color, back_color):
     panel.draw_str(x_centered, y, text, fg=colors.white, bg=None)
 
 
-def change_screen():
-    window = tdl.Console(SCREEN_HEIGHT, SCREEN_WIDTH)
-
-    # blit the contents of "window" to the root console
-    x = 0
-    y = 0
-    root.blit(window, x, y, 0, 0, SCREEN_HEIGHT - 1, SCREEN_WIDTH - 1, fg_alpha=1.0, bg_alpha=0.7)
-    tdl.flush()
-
-
 ############################################
 # player-related functions
 ############################################
@@ -833,7 +842,7 @@ def get_style_from_dict(style):
 ############################################
 def is_blocked(x, y):
     # first test the map tile
-    if world_map[x][y].blocked:
+    if current_map[x][y].blocked:
         return True
 
     # now check for any blocking objects
@@ -896,11 +905,215 @@ def pick_up():
 
 
 ############################################
+# player interactions functions
+############################################
+def handle_keys():
+    global fov_recompute, game_state, mouse_coord
+
+    keypress = False
+    for event in tdl.event.get():
+        if event.type == 'KEYDOWN':
+            user_input = event
+            keypress = True
+        if event.type == 'MOUSEMOTION':
+            mouse_coord = event.cell
+
+    if not keypress:
+        return 'didnt-take-turn'
+
+    if user_input.key == 'ENTER' and user_input.alt:
+        # Alt+Enter: toggle fullscreen
+        tdl.set_fullscreen(not tdl.get_fullscreen())
+
+    elif user_input.key == 'ESCAPE':
+        # game menu
+        choice = menu('Game Menu', ['Exit Game', 'Character Screen', 'Help'], 24)
+        print(choice)
+        if choice is 0:
+            print(choice)
+            double_check = menu('Are you sure?', ['No', 'Yes'], 24)
+            if double_check:
+                exit()
+            else:
+                return
+        elif choice is 1:
+            # TODO: add character screen
+            return
+        elif choice is 2:
+            # TODO: add help screen
+            return
+
+    if game_state == 'playing':
+        # movement keys
+        if user_input.key == 'UP' or user_input.key == 'TEXT' and user_input.text == '8':
+            player.move(0, -1)
+
+        elif user_input.key == 'DOWN' or user_input.key == 'TEXT' and user_input.text == '2':
+            player.move(0, 1)
+
+        elif user_input.key == 'LEFT' or user_input.key == 'TEXT' and user_input.text == '4':
+            player.move(-1, 0)
+
+        elif user_input.key == 'RIGHT' or user_input.key == 'TEXT' and user_input.text == '6':
+            player.move(1, 0)
+
+        elif user_input.key == 'TEXT':
+            if user_input.text == '7':
+                player.move(-1, -1)
+
+            elif user_input.text == '9':
+                player.move(1, -1)
+
+            elif user_input.text == '1':
+                player.move(-1, 1)
+
+            elif user_input.text == '3':
+                player.move(1, 1)
+
+            elif user_input.text == 'i':
+                choice = inventory_menu()
+                print(choice)
+                if choice is not None:
+                    item = player.fighter.inventory[choice]
+                    player.fighter.equip(item.item.equipment)
+
+            elif user_input.text == 'e':
+                equip_or_unequip(equipment_menu())
+
+            # force quit key?
+            elif user_input.text == 'Q':
+                exit()
+
+            elif user_input.text == 'd':
+                drop_menu()
+
+            elif user_input.text == ',':
+                player.fighter.handle_attack_move("left", "special")
+
+            elif user_input.text == '.':
+                player.fighter.handle_attack_move("right", "special")
+
+            elif user_input.text == 'k':
+                player.fighter.handle_attack_move("left", "normal")
+
+            elif user_input.text == 'l':
+                player.fighter.handle_attack_move("right", "normal")
+            elif user_input.text == '>':
+                enter_location(player.x, player.y)
+            else:
+                print(user_input.text)
+
+
+def get_names_under_mouse():
+    global mouse_coord
+    # return a string with the names of all objects under the mouse
+    (x, y) = mouse_coord
+
+    # create a list with the names of all objects at the mouse's coordinates and in FOV
+    names = [obj.name for obj in objects
+             if obj.x == x and obj.y == y and (obj.x, obj.y) in visible_tiles]
+
+    names = ', '.join(names)  # join the names, separated by commas
+    return names.capitalize()
+
+
+def inventory_menu():
+    if len(player.fighter.inventory) is 0:
+        options = ['Inventory is empty.']
+    else:
+        options = [item.name for item in player.fighter.inventory]
+        options.append("Close menu")
+    index = menu("Inventory", options, 30)
+    return index
+
+
+# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
+def equip_or_unequip(index):
+    print(index)
+    item = player.fighter.inventory[inventory_menu()]
+    #player.fighter.equip(item)
+    '''
+    if index is not None and index < len(player.fighter.inventory):
+        item_obj = player.fighter.inventory[index]
+        if item_obj.item.equipment:
+            for obj in player.fighter.inventory:
+                if obj == item_obj:
+                    if item_obj in get_all_equipped(player):
+                        player.fighter.unequip(item_obj.item.equipment)
+                    else:
+                        player.fighter.equip(item_obj.item.equipment)
+    '''
+
+
+def equipment_menu():
+    # TODO: fix equipment menu by showing each equipment slot and what is currently equipped there
+    options = []
+    if player.fighter.head:
+        options.append("Head: " + str(player.fighter.head.owner.owner.name))
+    else:
+        options.append("Head: None")
+    if player.fighter.chest:
+        options.append("Chest: " + str(player.fighter.chest.owner.owner.name))
+    else:
+        options.append("Chest: None")
+    if player.fighter.arms:
+        options.append("Arms: " + str(player.fighter.arms.owner.owner.name))
+    else:
+        options.append("Arms: None")
+    if player.fighter.legs:
+        options.append("Legs: " + str(player.fighter.legs.owner.owner.name))
+    else:
+        options.append("Legs: None")
+    if player.fighter.neck:
+        options.append("Neck: " + str(player.fighter.neck.owner.owner.name))
+    else:
+        options.append("Necks: None")
+    if player.fighter.ring1:
+        options.append("Right Ring: " + str(player.fighter.ring1.owner.owner.name))
+    else:
+        options.append("Right Ring: None")
+    if player.fighter.ring2:
+        options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name))
+    else:
+        options.append("Left Ring: None")
+    if player.fighter.right1:
+        options.append("Right Hand: " + str(player.fighter.right1.owner.owner.name))
+    else:
+        options.append("Right Hand: None")
+    if player.fighter.left1:
+        options.append("Left Hand: " + str(player.fighter.left1.owner.owner.name))
+    else:
+        options.append("Left Hand: None")
+    if player.fighter.right2:
+        options.append("Right Quickslot: " + str(player.fighter.right2.owner.owner.name))
+    else:
+        options.append("Right Quickslot: None")
+    if player.fighter.left2:
+        options.append("Left Quickslot: " + str(player.fighter.left2.owner.owner.name))
+    else:
+        options.append("Left Quickslot: None")
+    options.append("Close menu")
+    return menu("Equipment", options, 30)
+
+
+def skill_menu():
+    options = ['abc']
+    index = menu("Skills", options, SCREEN_WIDTH)
+    return index
+
+
+def drop_menu():
+    return
+
+
+def next_floor():
+    return
+
+
+############################################
 # map and world functions
 ############################################
 def make_world_map():
-    global world_map, current_map
-
     # fill map with unblocked tiles
     world_map = [[Tile(False)
                  for y in range(MAP_HEIGHT)]
@@ -1044,242 +1257,50 @@ def make_world_map():
 
     world_map[20][37].fog()
 
-    current_map = world_map
+    change_map(world_map)
 
 
 def generate_city():
-    global city_map, current_map
-
     city_map = [[Tile(False)
                 for y in range(MAP_HEIGHT)]
                 for x in range(MAP_WIDTH)]
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            city_map[x][y].plains()
 
-    current_map = city_map
+    city_map[random.randint(0, MAP_WIDTH)][random.randint(0, MAP_HEIGHT)].entry()
 
-
-############################################
-# player interactions functions
-############################################
-def handle_keys():
-    global fov_recompute, game_state, mouse_coord
-
-    keypress = False
-    for event in tdl.event.get():
-        if event.type == 'KEYDOWN':
-            user_input = event
-            keypress = True
-        if event.type == 'MOUSEMOTION':
-            mouse_coord = event.cell
-
-    if not keypress:
-        return 'didnt-take-turn'
-
-    if user_input.key == 'ENTER' and user_input.alt:
-        # Alt+Enter: toggle fullscreen
-        tdl.set_fullscreen(not tdl.get_fullscreen())
-
-    elif user_input.key == 'ESCAPE':
-        # game menu
-        choice = menu('Game Menu', ['Exit Game', 'Character Screen', 'Help'], 24)
-        print(choice)
-        if choice is 0:
-            print(choice)
-            double_check = menu('Are you sure?', ['No', 'Yes'], 24)
-            if double_check:
-                exit()
-            else:
-                return
-        elif choice is 1:
-            # TODO: add character screen
-            return
-        elif choice is 2:
-            # TODO: add help screen
-            return
-
-    if game_state == 'playing':
-        # movement keys
-        if user_input.key == 'UP' or user_input.key == 'TEXT' and user_input.text == '8':
-            player.move(0, -1)
-
-        elif user_input.key == 'DOWN' or user_input.key == 'TEXT' and user_input.text == '2':
-            player.move(0, 1)
-
-        elif user_input.key == 'LEFT' or user_input.key == 'TEXT' and user_input.text == '4':
-            player.move(-1, 0)
-
-        elif user_input.key == 'RIGHT' or user_input.key == 'TEXT' and user_input.text == '6':
-            player.move(1, 0)
-
-        elif user_input.key == 'TEXT':
-            if user_input.text == '7':
-                player.move(-1, -1)
-
-            elif user_input.text == '9':
-                player.move(1, -1)
-
-            elif user_input.text == '1':
-                player.move(-1, 1)
-
-            elif user_input.text == '3':
-                player.move(1, 1)
-
-            elif user_input.text == 'i':
-                choice = inventory_menu()
-                print(choice)
-                if choice is not None:
-                    item = player.fighter.inventory[choice]
-                    player.fighter.equip(item.item.equipment)
-
-            elif user_input.text == 'e':
-                equip_or_unequip(equipment_menu())
-
-            # force quit key?
-            elif user_input.text == 'Q':
-                exit()
-
-            elif user_input.text == 'd':
-                drop_menu()
-
-            elif user_input.text == ',':
-                player.fighter.handle_attack_move("left", "special")
-
-            elif user_input.text == '.':
-                player.fighter.handle_attack_move("right", "special")
-
-            elif user_input.text == 'k':
-                player.fighter.handle_attack_move("left", "normal")
-
-            elif user_input.text == 'l':
-                player.fighter.handle_attack_move("right", "normal")
-            elif user_input.text == '>':
-                change_location()
-            else:
-                print(user_input.text)
-
-
-def get_names_under_mouse():
-    global mouse_coord
-    # return a string with the names of all objects under the mouse
-    (x, y) = mouse_coord
-
-    # create a list with the names of all objects at the mouse's coordinates and in FOV
-    names = [obj.name for obj in objects
-             if obj.x == x and obj.y == y and (obj.x, obj.y) in visible_tiles]
-
-    names = ', '.join(names)  # join the names, separated by commas
-    return names.capitalize()
-
-
-def inventory_menu():
-    if len(player.fighter.inventory) is 0:
-        options = ['Inventory is empty.']
-    else:
-        options = [item.name for item in player.fighter.inventory]
-        options.append("Close menu")
-    index = menu("Inventory", options, 30)
-    return index
-
-
-# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
-def equip_or_unequip(index):
-    print(index)
-    item = player.fighter.inventory[inventory_menu()]
-    #player.fighter.equip(item)
-    '''
-    if index is not None and index < len(player.fighter.inventory):
-        item_obj = player.fighter.inventory[index]
-        if item_obj.item.equipment:
-            for obj in player.fighter.inventory:
-                if obj == item_obj:
-                    if item_obj in get_all_equipped(player):
-                        player.fighter.unequip(item_obj.item.equipment)
-                    else:
-                        player.fighter.equip(item_obj.item.equipment)
-    '''
-
-
-def equipment_menu():
-    # TODO: fix equipment menu by showing each equipment slot and what is currently equipped there
-    options = []
-    if player.fighter.head:
-        options.append("Head: " + str(player.fighter.head.owner.owner.name))
-    else:
-        options.append("Head: None")
-    if player.fighter.chest:
-        options.append("Chest: " + str(player.fighter.chest.owner.owner.name))
-    else:
-        options.append("Chest: None")
-    if player.fighter.arms:
-        options.append("Arms: " + str(player.fighter.arms.owner.owner.name))
-    else:
-        options.append("Arms: None")
-    if player.fighter.legs:
-        options.append("Legs: " + str(player.fighter.legs.owner.owner.name))
-    else:
-        options.append("Legs: None")
-    if player.fighter.neck:
-        options.append("Neck: " + str(player.fighter.neck.owner.owner.name))
-    else:
-        options.append("Necks: None")
-    if player.fighter.ring1:
-        options.append("Right Ring: " + str(player.fighter.ring1.owner.owner.name))
-    else:
-        options.append("Right Ring: None")
-    if player.fighter.ring2:
-        options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name))
-    else:
-        options.append("Left Ring: None")
-    if player.fighter.right1:
-        options.append("Right Hand: " + str(player.fighter.right1.owner.owner.name))
-    else:
-        options.append("Right Hand: None")
-    if player.fighter.left1:
-        options.append("Left Hand: " + str(player.fighter.left1.owner.owner.name))
-    else:
-        options.append("Left Hand: None")
-    if player.fighter.right2:
-        options.append("Right Quickslot: " + str(player.fighter.right2.owner.owner.name))
-    else:
-        options.append("Right Quickslot: None")
-    if player.fighter.left2:
-        options.append("Left Quickslot: " + str(player.fighter.left2.owner.owner.name))
-    else:
-        options.append("Left Quickslot: None")
-    options.append("Close menu")
-    return menu("Equipment", options, 30)
-
-
-def skill_menu():
-    options = ['abc']
-    index = menu("Skills", options, SCREEN_WIDTH)
-    return index
-
-
-def drop_menu():
-    return
-
-
-# TODO: update game_state var to accurately represent where player is currently at (menu, world map, city, etc)
-def change_location():
-    global game_state
-    #if game_state == 'dungeon':
-    # go to next floor
-        #next_floor()
-    #elif game_state == 'world':
-    enter_location(player.x, player.y)
-    change_screen()
-
-
-def next_floor():
-    return
+    return city_map
 
 
 def enter_location(x, y):
-    if world_map[x][y].char is 'o':
+    if current_map[x][y].char is 'o':
         message('You enter the city...', colors.gold)
-        generate_city()
-    elif world_map[x][y].char is '*':
-        message('You enter the dungeon...', colors.gold)
+        change_map(generate_city())
+    elif current_map[x][y].char is '*':
+        message('You attempt to enter the dungeon, but a mysterious force blocks you...', colors.gold)
+
+
+def change_map(new_map):
+    global current_map, old_map, fov_recompute, map_changed
+
+    if current_map:
+        old_map = current_map
+    current_map = new_map
+    fov_recompute = True
+    map_changed = True
+    change_player_location()
+
+
+def change_player_location():
+    global map_changed
+    
+    if map_changed:
+        for y in range(MAP_HEIGHT):
+            for x in range(MAP_WIDTH):
+                if current_map[x][y].label is "entry":
+                    player.x = x
+                    player.y = y
 
 
 ############################################
@@ -1314,7 +1335,13 @@ def render_all():
     global visible_tiles
     global player
     global current_map
+    global map_changed
 
+    if map_changed:
+        print("map_changed")
+        map_changed = False
+        con.clear()
+    
     if fov_recompute:
         fov_recompute = False
         visible_tiles = tdl.map.quickFOV(player.x, player.y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
@@ -1326,8 +1353,9 @@ def render_all():
                 if not visible:
                     # if it's not visible right now, the player can only see it if it's explored
                     if current_map[x][y].explored:
-                        # print(x, y)
                         con.draw_char(x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=None)
+                    else:
+                        con.draw_char(x, y, None, None, bg=None)
                 else:
                     con.draw_char(x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=None)
                     # since it's visible, explore it
@@ -1338,6 +1366,7 @@ def render_all():
         if obj != player:
             obj.draw()
     player.draw()
+    
     # blit the contents of "con" to the root console and present it
     root.blit(con, 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0)
 
@@ -1362,15 +1391,15 @@ def render_all():
 
 
 def is_visible_tile(x, y):
-    global world_map
+    global current_map
 
     if x >= MAP_WIDTH or x < 0:
         return False
     elif y >= MAP_HEIGHT or y < 0:
         return False
-    elif world_map[x][y].blocked:
+    elif current_map[x][y].blocked:
         return False
-    elif world_map[x][y].block_sight:
+    elif current_map[x][y].block_sight:
         return False
     else:
         return True
@@ -1491,5 +1520,7 @@ game_msgs = []  # buffer of the messages that appear on the screen
 fov_recompute = True
 player_action = None
 mouse_coord = (0, 0)
+
+current_map = False
 
 main_menu()
