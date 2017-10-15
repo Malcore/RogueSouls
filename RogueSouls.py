@@ -899,7 +899,7 @@ def pick_up():
 # map and world functions
 ############################################
 def make_world_map():
-    global world_map
+    global world_map, current_map
 
     # fill map with unblocked tiles
     world_map = [[Tile(False)
@@ -965,9 +965,9 @@ def make_world_map():
     world_map[1][37].fog()
 
     world_map[2][0].fog()
-    world_map[2][1].mountain()
-    world_map[2][2].mountain()
-    world_map[2][3].mountain()
+    world_map[2][1].plains() #mountain()
+    world_map[2][2].plains() #mountain()
+    world_map[2][3].plains() #mountain()
     world_map[2][4].path()
     world_map[2][5].plains()
     world_map[2][6].forest()
@@ -1028,7 +1028,6 @@ def make_world_map():
     world_map[11][37].fog()
 
     world_map[12][37].fog()
-
     world_map[13][37].fog()
 
     world_map[14][37].fog()
@@ -1044,6 +1043,18 @@ def make_world_map():
     world_map[19][37].fog()
 
     world_map[20][37].fog()
+
+    current_map = world_map
+
+
+def generate_city():
+    global city_map, current_map
+
+    city_map = [[Tile(False)
+                for y in range(MAP_HEIGHT)]
+                for x in range(MAP_WIDTH)]
+
+    current_map = city_map
 
 
 ############################################
@@ -1266,6 +1277,7 @@ def next_floor():
 def enter_location(x, y):
     if world_map[x][y].char is 'o':
         message('You enter the city...', colors.gold)
+        generate_city()
     elif world_map[x][y].char is '*':
         message('You enter the dungeon...', colors.gold)
 
@@ -1301,6 +1313,7 @@ def render_all():
     global fov_recompute
     global visible_tiles
     global player
+    global current_map
 
     if fov_recompute:
         fov_recompute = False
@@ -1312,13 +1325,13 @@ def render_all():
                 visible = (x, y) in visible_tiles
                 if not visible:
                     # if it's not visible right now, the player can only see it if it's explored
-                    if world_map[x][y].explored:
+                    if current_map[x][y].explored:
                         # print(x, y)
-                        con.draw_char(x, y, world_map[x][y].char, world_map[x][y].fog_color, bg=None)
+                        con.draw_char(x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=None)
                 else:
-                    con.draw_char(x, y, world_map[x][y].char, world_map[x][y].vis_color, bg=None)
+                    con.draw_char(x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=None)
                     # since it's visible, explore it
-                    world_map[x][y].explored = True
+                    current_map[x][y].explored = True
 
     # draw all objects in the list
     for obj in objects:
@@ -1420,8 +1433,7 @@ def new_game():
     game_state = 'playing'
 
     # a warm welcoming message!
-    message('You awaken with a burning desire. You feel as if you should recognize this place. The walls are covered in'
-            ' rot and the stench of death is in the air.', colors.red)
+    message('You awaken with a burning desire to act. You feel as if you should recognize this place.', colors.red)
 
     # initial equipment: a broken sword
     equipment_component = Equipment(slot='hand', durability=10, equippable_at = 'hand')
