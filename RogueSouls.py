@@ -309,7 +309,7 @@ class Player:
 class Fighter:
     # defines something that can take combat actions (e.g. any living character) and gives them combat statistics as
     # well as defining actions they can take during combat
-    def __init__(self, vig=0, att=0, end=0, str=0, dex=0, int=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
+    def __init__(self, vig=0, att=0, end=0, strn=0, dex=0, intl=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
                  att_slots=0, right1=None, right2=None, left1=None, left2=None, head=None, chest=None, legs=None,
                  arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
                  def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0, res_frost=0, res_curse=0,
@@ -318,9 +318,9 @@ class Fighter:
         self.vig = vig
         self.att = att
         self.end = end
-        self.str = str
+        self.str = strn
         self.dex = dex
-        self.int = int
+        self.int = intl
         self.fai = fai
         self.luc = luc
         self.wil = wil
@@ -376,7 +376,7 @@ class Fighter:
         # hp = 2E-07x^6 - 7E-05x^5 + 0.0071x^4 - 0.3803x^3 + 9.908x^2 - 81.809x + 533.94
         # 403 hp at base (10) vigor
         # +0.4 res/vig and 0.2 def/vig
-        self.hit_points = math.ceil(40*self.vig - 1.15*self.vig)
+        self.hit_points = int(math.ceil(40*self.vig - 1.15*self.vig))
         self.def_lightn += 0.4 * self.vig
         self.def_mag += 0.4 * self.vig
         self.def_fire += 0.4 * self.vig
@@ -1267,6 +1267,50 @@ def generate_city():
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
             city_map[x][y].plains()
+
+    """
+    # logic for city map generation
+    1. divide map into sectors (residential, governmental, etc)
+    2. create roads between sectors
+    2. generate random buildings corresponding to sector type
+    3. delete buildings intersecting roads or other buildings
+    4. add additional structures/features in open spaces
+    5. add characters
+
+    # pseudocode
+    
+    # create randomized number of sectors
+    num_sectors = random.randint(4, 8)
+    sector_width = MAP_WIDTH - 1 / num_sectors / 2
+    sector_height = MAP_HEIGHT - 1 / num_sectors / 2
+
+    # create individual sector maps
+    # first create sectors dictionary, then create a sector map item for each sector
+    sectors = {}
+    for i in range(num_sectors):
+        sectors["sector_map{0}".format(i)] = random.choice(dicts.sector_list)
+
+    # next add each x and y coordinate within that sector to that sector's item
+    for x i range(num_sectors):
+        for y in range(sector_height + x * sector_height):
+            for x in range(sector_width + x * sector_width):
+                sectors["sector_map{1}".format(i)] += str(x, y)
+
+    # add roads between sectors
+    for j in range(num_sectors):
+        if(x,y) not in sectors[sector_map{1}.format(j)]:
+            city_map[x][y].path()
+
+    # add random buildings to each sector
+    for k in range(num_sectors):
+        if sectors[sector_map{0}.format(k)] = 'res':
+            # add res buildings
+        elif sectors[sector_map{0}.format(k)] = 'gov':
+            # add gov buildings
+        elif sectors[sector_map{0}.format(k)] = 'mil':
+            # add mil buildings
+    """
+    
 
     city_map[random.randint(0, MAP_WIDTH)][random.randint(0, MAP_HEIGHT)].entry()
 

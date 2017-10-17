@@ -112,3 +112,19 @@ AI = {
 }
 
 
+location_info = {
+    'city': {
+        'human',
+        'giant',
+        ''
+    },
+    'dungeon': {
+
+    },
+
+    'castle': {
+
+    }
+}
+
+sector_list = ['res', 'gov', 'mil']
