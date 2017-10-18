@@ -192,7 +192,7 @@ class Tile:
         self.blocked = blocked
 
         # all tiles start unexplored
-        self.explored = False
+        self.explored = True
 
         # by default, if a tile is blocked, it also blocks sight
         if blocked is None:
@@ -247,9 +247,9 @@ class Tile:
     def entry(self):
         self.blocked = False
         self.block_sight = False
-        self.char = '.'
-        self.vis_color = colors.darker_amber
-        self.fog_color = colors.darkest_amber
+        self.char = '<'
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
         self.label = "entry"
 
     def plains(self):
@@ -318,9 +318,9 @@ class Fighter:
         self.vig = vig
         self.att = att
         self.end = end
-        self.str = strn
+        self.strn = strn
         self.dex = dex
-        self.int = intl
+        self.intl = intl
         self.fai = fai
         self.luc = luc
         self.wil = wil
@@ -908,7 +908,7 @@ def pick_up():
 # player interactions functions
 ############################################
 def handle_keys():
-    global fov_recompute, game_state, mouse_coord
+    global fov_recompute, game_state, mouse_coord, last_button
 
     keypress = False
     for event in tdl.event.get():
@@ -945,35 +945,42 @@ def handle_keys():
 
     if game_state == 'playing':
         # movement keys
-        if user_input.key == 'UP' or user_input.key == 'TEXT' and user_input.text == '8':
+        if user_input.key == 'UP' or user_input.text == '8':
             player.move(0, -1)
+            last_button = '8'
 
-        elif user_input.key == 'DOWN' or user_input.key == 'TEXT' and user_input.text == '2':
+        elif user_input.key == 'DOWN' or user_input.text == '2':
             player.move(0, 1)
+            last_button = '2'
 
-        elif user_input.key == 'LEFT' or user_input.key == 'TEXT' and user_input.text == '4':
+        elif user_input.key == 'LEFT' or user_input.text == '4':
             player.move(-1, 0)
+            last_button = '4'
 
-        elif user_input.key == 'RIGHT' or user_input.key == 'TEXT' and user_input.text == '6':
+        elif user_input.key == 'RIGHT' or user_input.text == '6':
             player.move(1, 0)
+            last_button = '6'
 
         elif user_input.key == 'TEXT':
             if user_input.text == '7':
                 player.move(-1, -1)
+                last_button = '7'
 
             elif user_input.text == '9':
                 player.move(1, -1)
+                last_button = '9'
 
             elif user_input.text == '1':
                 player.move(-1, 1)
+                last_button = '1'
 
             elif user_input.text == '3':
                 player.move(1, 1)
+                last_button = '3'
 
             elif user_input.text == 'i':
                 choice = inventory_menu()
-                print(choice)
-                if choice is not None:
+                if choice is not None and choice < len(player.fighter.inventory):
                     item = player.fighter.inventory[choice]
                     player.fighter.equip(item.item.equipment)
 
@@ -998,10 +1005,12 @@ def handle_keys():
 
             elif user_input.text == 'l':
                 player.fighter.handle_attack_move("right", "normal")
+
             elif user_input.text == '>':
                 enter_location(player.x, player.y)
-            else:
-                print(user_input.text)
+
+            elif user_input.text == '<':
+                exit_location(player.x, player.y)
 
 
 def get_names_under_mouse():
@@ -1030,7 +1039,9 @@ def inventory_menu():
 # Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
 def equip_or_unequip(index):
     print(index)
-    item = player.fighter.inventory[inventory_menu()]
+    item_choice = inventory_menu()
+    if item_choice is not None:
+        item = player.fighter.inventory[item_choice]
     #player.fighter.equip(item)
     '''
     if index is not None and index < len(player.fighter.inventory):
@@ -1119,52 +1130,15 @@ def make_world_map():
                  for y in range(MAP_HEIGHT)]
                  for x in range(MAP_WIDTH)]
 
-    world_map[0][0].fog()
-    world_map[0][1].fog()
-    world_map[0][2].fog()
-    world_map[0][3].fog()
-    world_map[0][4].fog()
-    world_map[0][5].fog()
-    world_map[0][6].fog()
-    world_map[0][7].fog()
-    world_map[0][8].fog()
-    world_map[0][9].fog()
-    world_map[0][10].fog()
-    world_map[0][11].fog()
-    world_map[0][12].fog()
-    world_map[0][13].fog()
-    world_map[0][14].fog()
-    world_map[0][15].fog()
-    world_map[0][16].fog()
-    world_map[0][17].fog()
-    world_map[0][18].fog()
-    world_map[0][19].fog()
-    world_map[0][20].fog()
-    world_map[0][21].fog()
-    world_map[0][22].fog()
-    world_map[0][23].fog()
-    world_map[0][24].fog()
-    world_map[0][25].fog()
-    world_map[0][20].fog()
-    world_map[0][21].fog()
-    world_map[0][22].fog()
-    world_map[0][23].fog()
-    world_map[0][24].fog()
-    world_map[0][25].fog()
-    world_map[0][26].fog()
-    world_map[0][27].fog()
-    world_map[0][28].fog()
-    world_map[0][29].fog()
-    world_map[0][30].fog()
-    world_map[0][31].fog()
-    world_map[0][32].fog()
-    world_map[0][33].fog()
-    world_map[0][34].fog()
-    world_map[0][35].fog()
-    world_map[0][36].fog()
-    world_map[0][37].fog()
+    # Create fog border around map
+    for i in range(MAP_WIDTH):
+        world_map[i][0].fog()
+        world_map[i][MAP_HEIGHT - 1].fog()
+    for j in range(MAP_HEIGHT):
+        world_map[0][j].fog()
+        world_map[MAP_WIDTH - 1][j].fog()
 
-    world_map[1][0].fog()
+    # Add other tiles
     world_map[1][1].path()
     world_map[1][2].path()
     world_map[1][3].path()
@@ -1172,92 +1146,57 @@ def make_world_map():
     world_map[1][5].plains()
     world_map[1][6].forest()
     world_map[1][7].forest()
-    world_map[1][8].desert()
-    world_map[1][9].swamp()
-    world_map[1][10].water()
-    world_map[1][37].fog()
+    world_map[1][8].forest()
+    world_map[1][9].forest()
+    world_map[1][10].forest()
 
-    world_map[2][0].fog()
-    world_map[2][1].plains() #mountain()
-    world_map[2][2].plains() #mountain()
-    world_map[2][3].plains() #mountain()
+    world_map[2][1].mountain()
+    world_map[2][2].mountain()
+    world_map[2][3].mountain()
     world_map[2][4].path()
     world_map[2][5].plains()
     world_map[2][6].forest()
     world_map[2][7].forest()
-    world_map[2][37].fog()
+    world_map[2][8].forest()
+    world_map[2][9].forest()
+    world_map[2][10].forest()
 
-    world_map[3][0].fog()
     world_map[3][1].mountain()
     world_map[3][2].city()
     world_map[3][3].mountain()
     world_map[3][4].path()
     world_map[3][5].mountain()
     world_map[3][6].fog()
-    world_map[3][37].fog()
 
-    world_map[4][0].fog()
     world_map[4][1].mountain()
     world_map[4][2].path()
     world_map[4][3].mountain()
     world_map[4][4].path()
     world_map[4][5].mountain()
     world_map[4][6].fog()
-    world_map[4][37].fog()
 
-    world_map[5][0].fog()
     world_map[5][1].path()
     world_map[5][2].mountain()
     world_map[5][3].mountain()
     world_map[5][4].path()
     world_map[5][5].mountain()
     world_map[5][6].fog()
-    world_map[5][37].fog()
 
-    world_map[6][0].fog()
     world_map[6][1].mountain()
     world_map[6][2].path()
     world_map[6][3].dungeon()
     world_map[6][4].mountain()
     world_map[6][5].mountain()
     world_map[6][6].fog()
-    world_map[6][37].fog()
 
-    world_map[7][0].fog()
     world_map[7][1].mountain()
     world_map[7][2].mountain()
     world_map[7][3].mountain()
     world_map[7][4].mountain()
     world_map[7][5].fog()
     world_map[7][6].fog()
-    world_map[7][37].fog()
 
-    world_map[8][37].fog()
-
-    world_map[9][37].fog()
-
-    world_map[10][37].fog()
-
-    world_map[11][37].fog()
-
-    world_map[12][37].fog()
-    world_map[13][37].fog()
-
-    world_map[14][37].fog()
-
-    world_map[15][37].fog()
-
-    world_map[16][37].fog()
-
-    world_map[17][37].fog()
-
-    world_map[18][37].fog()
-
-    world_map[19][37].fog()
-
-    world_map[20][37].fog()
-
-    change_map(world_map)
+    change_map(world_map, "world")
 
 
 def generate_city():
@@ -1312,20 +1251,30 @@ def generate_city():
     """
     
 
-    city_map[random.randint(0, MAP_WIDTH)][random.randint(0, MAP_HEIGHT)].entry()
+    # city_map[random.randint(0, MAP_WIDTH)][random.randint(0, MAP_HEIGHT)].entry()
 
     return city_map
 
 
 def enter_location(x, y):
+    global entry_coords
+
+    entry_coords = (x, y)
     if current_map[x][y].char is 'o':
         message('You enter the city...', colors.gold)
-        change_map(generate_city())
+        change_map(generate_city(), "city")
     elif current_map[x][y].char is '*':
         message('You attempt to enter the dungeon, but a mysterious force blocks you...', colors.gold)
+        # change_map(generate_dungeon(), "dungeon")
 
 
-def change_map(new_map):
+def exit_location(x, y):
+    if current_map[x][y].char is '<':
+        message('You leave the location and continue your quest.', colors.gold)
+        change_map(old_map, "world")
+
+
+def change_map(new_map, label):
     global current_map, old_map, fov_recompute, map_changed
 
     if current_map:
@@ -1333,18 +1282,52 @@ def change_map(new_map):
     current_map = new_map
     fov_recompute = True
     map_changed = True
-    change_player_location()
+    change_player_location(label)
+    objects = []
+    objects.append(player)
+    # objects.append(current_map.objects)
 
 
-def change_player_location():
+def change_player_location(map_label):
     global map_changed
-    
+
     if map_changed:
-        for y in range(MAP_HEIGHT):
-            for x in range(MAP_WIDTH):
-                if current_map[x][y].label is "entry":
-                    player.x = x
-                    player.y = y
+        if map_label == "city":
+            if last_button is '1':
+                current_map[MAP_WIDTH][0].entry()
+                player.x = MAP_WIDTH - 1
+                player.y = 0
+            elif last_button is '2' or last_button is 'DOWN':
+                current_map[MAP_WIDTH // 2][0].entry()
+                player.x = MAP_WIDTH // 2
+                player.y = 0
+            elif last_button is '3':
+                print("button is 3")
+                current_map[0][0].entry()
+                player.x = 0
+                player.y = 0
+            elif last_button is '4' or last_button is 'LEFT':
+                current_map[MAP_WIDTH - 1][MAP_HEIGHT // 2].entry()
+                player.x = MAP_WIDTH - 1
+                player.y = MAP_HEIGHT // 2
+            elif last_button is '6' or last_button is 'RIGHT':
+                current_map[0][MAP_HEIGHT // 2].entry()
+                player.x = 0
+                player.y = MAP_HEIGHT // 2
+            elif last_button is '7':
+                current_map[MAP_WIDTH - 1][MAP_HEIGHT - 1].entry()
+                player.x = MAP_WIDTH - 1
+                player.y = MAP_HEIGHT - 1
+            elif last_button is '8' or last_button is 'UP':
+                current_map[MAP_WIDTH // 2][MAP_HEIGHT - 1].entry()
+                player.x = MAP_WIDTH // 2
+                player.y = MAP_HEIGHT - 1
+            elif last_button is '9':
+                current_map[0][MAP_HEIGHT - 1].entry()
+                player.x = 0
+                player.y = MAP_HEIGHT - 1
+        elif map_label is "world":
+            player.x, player.y = entry_coords
 
 
 ############################################
@@ -1382,7 +1365,6 @@ def render_all():
     global map_changed
 
     if map_changed:
-        print("map_changed")
         map_changed = False
         con.clear()
     
@@ -1405,7 +1387,7 @@ def render_all():
                     # since it's visible, explore it
                     current_map[x][y].explored = True
 
-    # draw all objects in the list
+    # draw all objects in the list for current map
     for obj in objects:
         if obj != player:
             obj.draw()
@@ -1520,7 +1502,6 @@ def new_game():
 
 def play_game():
     # player_action = None
-    make_world_map()
     game_state = 'playing'
 
     # main loop
@@ -1560,6 +1541,8 @@ root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT // 2 - 10, 'By Jerezereh')
 
 objects = []  # everything in the game that isn't a tile
 game_msgs = []  # buffer of the messages that appear on the screen
+last_button = ''
+entry_coords = (1, 1)
 
 fov_recompute = True
 player_action = None
