@@ -2,26 +2,26 @@ import math
 import tdl
 import colors
 
-import RogueSoulsGlobals as gbl
-import RogueSoulsUtils as rsu
-import RogueSouls as rs
+from Globals import *
+import Utils as utl
+from Console import menu
 
 
 class Fighter:
     # defines something that can take combat actions (e.g. any living character) and gives them combat statistics as
     # well as defining actions they can take during combat
-    def __init__(self, vig=0, att=0, end=0, str=0, dex=0, int=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
+    def __init__(self, vig=0, att=0, end=0, strn=0, dex=0, intl=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
                  att_slots=0, right1=None, right2=None, left1=None, left2=None, head=None, chest=None, legs=None,
                  arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
                  def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0, res_frost=0, res_curse=0,
                  bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1, soul_value=0, wait_time=0,
-                 dodge_frames=gbl.DODGE_TIME, inventory=[], blocking=False, death_func=None, ai=None):
+                 dodge_frames=DODGE_TIME, inventory=[], blocking=False, death_func=None, ai=None):
         self.vig = vig
         self.att = att
         self.end = end
-        self.str = str
+        self.strn = strn
         self.dex = dex
-        self.int = int
+        self.intl = intl
         self.fai = fai
         self.luc = luc
         self.wil = wil
@@ -77,7 +77,7 @@ class Fighter:
         # hp = 2E-07x^6 - 7E-05x^5 + 0.0071x^4 - 0.3803x^3 + 9.908x^2 - 81.809x + 533.94
         # 403 hp at base (10) vigor
         # +0.4 res/vig and 0.2 def/vig
-        self.hit_points = math.ceil(40*self.vig - 1.15*self.vig)
+        self.hit_points = int(math.ceil(40*self.vig - 1.15*self.vig))
         self.def_lightn += 0.4 * self.vig
         self.def_mag += 0.4 * self.vig
         self.def_fire += 0.4 * self.vig
@@ -168,15 +168,15 @@ class Fighter:
 
     def attack_handler(self, side, dir, type):
         if side == "right":
-            wep = rsu.get_equipped_in_slot(self, "right1")
+            wep = utl.get_equipped_in_slot(self, "right1")
         else:
-            wep = rsu.get_equipped_in_slot(self, "left1")
+            wep = utl.get_equipped_in_slot(self, "left1")
         if wep is None:
             wep_name = "Unarmed"
         else:
             wep_name = wep.owner.owner.name
-        wep_dict = rsu.get_wep_dict(wep_name)
-        dmg_type_dict = rsu.get_style_from_dict(wep_dict[1][0])
+        wep_dict = utl.get_wep_dict(wep_name)
+        dmg_type_dict = utl.get_style_from_dict(wep_dict[1][0])
         if type == "normal":
             speed = wep_dict[1][2]
         else:
@@ -185,8 +185,8 @@ class Fighter:
 
     def attack(self, dmg_type, speed, dir, type, dmg):
         target = None
-        for obj in rs.objects:
-            if (obj.x - rs.player.x, obj.y - rs.player.y) == dir:
+        for obj in objects:
+            if (obj.x - player.x, obj.y - player.y) == dir:
                 target = obj
         if target:
             self.att_damage(target.fighter, dmg_type, type, int(dmg))
@@ -194,16 +194,16 @@ class Fighter:
 
     def dodge(self):
         # TODO: add frames equal to speed plus bonuses to wait_time
-        self.wait_time += gbl.DODGE_TIME
+        self.wait_time += DODGE_TIME
 
     def parry(self):
         # TODO: implement parry system
-        self.wait_time += gbl.PARRY_SPEED
+        self.wait_time += PARRY_SPEED
         return self
 
     def block(self):
         # TODO: implement blocking system
-        self.wait_time += gbl.BLOCK_SPEED
+        self.wait_time += BLOCK_SPEED
         return self
 
     # function is called each frame during combat
@@ -217,25 +217,25 @@ class Fighter:
         died = False
         eff_list = []
         if dmg_type == "slash" or dmg_type == "blunt" or dmg_type == "pierce":
-            died = rsu.deal_phys_dmg(target, type, dmg, dmg_type)
+            died = deal_phys_dmg(target, type, dmg, dmg_type)
         if dmg_type == "mag":
-            died = rsu.deal_mag_dmg(target, type)
+            died = deal_mag_dmg(target, type)
         if dmg_type == "fire":
-            died = rsu.deal_fire_dmg(target, type)
+            died = deal_fire_dmg(target, type)
         if dmg_type == "lightn":
-            died = rsu.deal_lightn_dmg(target, type)
+            died = deal_lightn_dmg(target, type)
         if dmg_type == "dark":
-            died = rsu.deal_dark_dmg(target, type)
+            died = deal_dark_dmg(target, type)
         if "bleed" in eff_list:
-            rsu.add_bleed(target, self.curr_r)
+            add_bleed(target, self.curr_r)
         if "poison" in eff_list:
-            rsu.add_poison(target, self.curr_r)
+            add_poison(target, self.curr_r)
         if "frost" in eff_list:
-            rsu.add_frost(target, self.curr_r)
+            add_frost(target, self.curr_r)
         if "curse" in eff_list:
-            rsu.add_curse(target, self.curr_r)
+            add_curse(target, self.curr_r)
         if died:
-            rsu.message(str(target.owner.name) + "has died!")
+            utl.message(str(target.owner.name) + "has died!")
             target.death()
 
     def death(self):
@@ -244,13 +244,13 @@ class Fighter:
             func = self.death_func
             func()
         else:
-            rsu.basic_death(self)
+            basic_death()
 
     def equip(self, item):
         success = False
         options = ['Head', 'Chest', 'Arms', 'Legs', 'Neck', 'Right Hand', 'Left Hand', 'Right Ring', 'Left Ring',
                    'Right Hand Quick Slot', 'Left Hand Quick Slot']
-        choice = rsu.menu("Equip in which slot?", options, gbl.SCREEN_WIDTH)
+        choice = menu("Equip in which slot?", options, SCREEN_WIDTH)
         if choice is None or choice > len(options):
             return
         if choice is 0 and item.equippable_at is 'head':
@@ -299,13 +299,99 @@ class Fighter:
             success = True
         if success:
             item.is_equipped = True
-            rsu.message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
+            utl.message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
 
     # unequip object and show a message about it
     def unequip(self, item):
         if not item.is_equipped:
             return
-        rsu.message('Unequipped ' + item.owner.owner.name + ' from ' + item.slot + '.', colors.light_green)
+        utl.message('Unequipped ' + item.owner.owner.name + ' from ' + item.slot + '.', colors.light_green)
         setattr(self, str(item.equipped_at), None)
         item.is_equipped = False
         item.equipped_at = None
+
+
+    def basic_death(self):
+        for obj in objects:
+            if obj is self.owner:
+                objects.remove(obj)
+                del obj
+
+
+#################################
+# damage functions
+#################################
+def deal_phys_dmg(target, type, dmg, dmg_type=None):
+    dmg_reduc = target.def_phys / 100
+    if target.blocking:
+        dmg_reduc += target.curr_l.def_phys / 100
+    if dmg_type is "slashing":
+        dmg_reduc += target.def_slash / 100
+    elif dmg_type is "blunt":
+        dmg_reduc += target.def_blunt / 100
+    elif dmg_type is "piercing":
+        dmg_reduc += target.def_piercing / 100
+    if dmg_reduc > 1:
+        dmg_reduc = 1
+    elif type == "special":
+        dmg = dmg * 1.5
+    final_dmg = math.ceil(dmg - round(dmg_reduc * dmg))
+    target.curr_hp -= final_dmg
+    if target.curr_hp <= 0:
+        return True
+    utl.message(str(target.owner.name) + " was dealt " + str(final_dmg) + " damage!")
+
+
+def deal_mag_dmg(target, curr_wep):
+    dmg_reduc = target.def_mag / 100
+    if dmg_reduc > 1:
+        dmg_reduc = 1
+    target.curr_hp -= curr_wep.dmg_mag - round(dmg_reduc * curr_wep.dmg_mag)
+    if target.curr_hp <= 0:
+        return True
+
+
+def deal_fire_dmg(target, curr_wep):
+    dmg_reduc = target.def_fire / 100
+    if dmg_reduc > 1:
+        dmg_reduc = 1
+    target.curr_hp -= curr_wep.dmg_fire - round(dmg_reduc * curr_wep.dmg_fire)
+    if target.curr_hp <= 0:
+        return True
+
+
+def deal_lightn_dmg(target, curr_wep):
+    dmg_reduc = target.def_lightn / 100
+    if dmg_reduc > 1:
+        dmg_reduc = 1
+    target.curr_hp -= curr_wep.dmg_lightn - round(dmg_reduc * curr_wep.dmg_lightn)
+    if target.curr_hp <= 0:
+        return True
+
+
+def deal_dark_dmg(target, curr_wep):
+    dmg_reduc = target.def_dark / 100
+    if dmg_reduc > 1:
+        dmg_reduc = 1
+    target.curr_hp -= curr_wep.dmg_dark - round(dmg_reduc * curr_wep.dmg_dark)
+    if target.curr_hp <= 0:
+        return True
+
+
+#################################
+# functions for damage effects
+#################################
+def add_bleed(target, curr_wep):
+    target.bleed_amt += curr_wep.eff_bleed - round(target.res_bleed / 100 * curr_wep.eff_bleed)
+
+
+def add_poison(target, curr_wep):
+    target.poison_amt += curr_wep.eff_poison - round(target.res_poison / 100 * curr_wep.eff_poison)
+
+
+def add_frost(target, curr_wep):
+    target.frost_amt += curr_wep.eff_frost - round(target.res_frost / 100 * curr_wep.eff_frost)
+
+
+def add_curse(target, curr_wep):
+    target.curse_amt += curr_wep.eff_curse - round(target.res_curse / 100 * curr_wep.eff_curse)

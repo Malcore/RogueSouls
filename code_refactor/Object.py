@@ -1,8 +1,7 @@
 import math
 
-import RogueSoulsGlobals as gbl
-import RogueSoulsUtils as rsu
-import RogueSouls as rs
+import Globals as gbl
+import Utils as utl
 
 
 class Object:
@@ -37,12 +36,12 @@ class Object:
             return
         elif self.y + dy > gbl.MAP_HEIGHT - 1 or self.y + dy < 0:
             return
-        for obj in objects:
+        for obj in gbl.objects:
             if obj.x is self.x + dx and obj.y is self.y + dy:
                 if self.player:
                     fov_recompute = True
                 return
-        if not rsu.is_blocked(self.x + dx, self.y + dy):
+        if not utl.is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
         if self.player:
@@ -70,19 +69,7 @@ class Object:
         # return the distance to some coordinates
         return math.sqrt((x - self.x) ** 2 + (y - self.y) ** 2)
 
-    def draw(self):
-        global visible_tiles
-
-        if (self.x, self.y) in visible_tiles:
-            # set the color and then draw the character that represents this object at its position
-            rs.con.draw_char(self.x, self.y, self.char, self.color, bg=None)
-
-    def clear(self):
-        # erase the character that represents this object
-        rs.con.draw_char(self.x, self.y, ' ', self.color, bg=None)
-
     def send_to_back(self):
         # make this object be drawn first, so all others appear above it if they're in the same tile
-        global objects
-        objects.remove(self)
-        objects.insert(0, self)
+        gbl.objects.remove(self)
+        gbl.objects.insert(0, self)

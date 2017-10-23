@@ -4,10 +4,13 @@ import random
 import math
 import textwrap
 import sys
+import ast
 import dictionaries as dicts
+import maps
 
 # Global variables
-LIMIT_FPS = 20
+LIMIT_FPS = 30
+MAX_RECURSE = 800
 
 # actual size of the window in characters (or 960x720 pixels)
 SCREEN_WIDTH = 100
@@ -17,11 +20,9 @@ SCREEN_HEIGHT = 50
 MAP_WIDTH = 100
 MAP_HEIGHT = 38
 
-# color constants
-color_dark_wall = colors.darker_gray
-color_dark_ground = colors.darkest_amber
-color_light_wall = colors.dark_gray
-color_light_ground = colors.darker_amber
+# height constants
+MAX_HEIGHT = 100
+MIN_HEIGHT = 0
 
 # stat bars
 BAR_LENGTH = 20
@@ -105,20 +106,17 @@ class Object:
             self.player.owner = self
 
     def move(self, dx, dy):
-        global fov_recompute
+        global fov_recompute, current_map, map_num
         # move by the given amount
         if self.x + dx > MAP_WIDTH - 1 or self.x + dx < 0:
             return
         elif self.y + dy > MAP_HEIGHT - 1 or self.y + dy < 0:
             return
-        for obj in objects:
-            if obj.x is self.x + dx and obj.y is self.y + dy:
-                if self.player:
-                    fov_recompute = True
-                return
         if not is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
+            if current_map[self.x][self.y].linking:
+                load_map(current_map[self.x][self.y].linked_map_num)
         if self.player:
             fov_recompute = True
 
@@ -184,11 +182,9 @@ class Equipment:
         self.is_equipped = False
 
 
-# TODO: somehow link area maps to locations on world map, such as cities and dungeons
-# TODO: find method to store location maps (matrix with Tile types defined, like world map?)
 class Tile:
     # a tile of the map and its properties
-    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, label=None):
+    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, linking=False, linked_map_num = None, label=None):
         self.blocked = blocked
 
         # all tiles start unexplored
@@ -202,7 +198,40 @@ class Tile:
         self.char = char
         self.vis_color = vis_color
         self.fog_color = fog_color
+        # declares if tile links to different map
+        self.linking = linking
+        # delcares which map tile is linked to
+        self.linked_map_num = linked_map_num
         self.label = label
+
+        # Tile types, calling a function will set the tile to that type
+        # Current total: 19
+    def abyss(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = None
+        self.vis_color = colors.black
+        self.fog_color = colors.black
+        self.linking = False
+        self.label = "abyss"
+
+    def bird_nest(self):
+        self.blocked = False
+        self.block_sight = True
+        self.char = chr(177)
+        self.vis_color = colors.dark_sepia
+        self.fog_color = colors.darker_sepia
+        self.linking = False
+        self.label = "bird_nest"
+
+    def cave_floor(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '.'
+        self.vis_color = colors.dark_gray
+        self.fog_color = colors.darker_gray
+        self.linking = False
+        self.label = "cave_floor"
 
     def city(self):
         self.blocked = False
@@ -210,7 +239,35 @@ class Tile:
         self.char = 'o'
         self.vis_color = colors.yellow
         self.fog_color = colors.dark_yellow
+        self.linking = True
         self.label = "city"
+
+    def dead_bush(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '&'
+        self.vis_color = colors.darker_sepia
+        self.fog_color = colors.darkest_sepia
+        self.linking = False
+        self.label = "dead_bush"
+
+    def desert(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = chr(247)
+        self.vis_color = colors.yellow
+        self.fog_color = colors.desaturated_yellow
+        self.linking = False
+        self.label = "desert"
+
+    def dirt(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '.'
+        self.vis_color = colors.darker_amber
+        self.fog_color = colors.darkest_amber
+        self.linking = False
+        self.label = "dirt"
 
     def dungeon(self):
         self.blocked = False
@@ -218,15 +275,45 @@ class Tile:
         self.char = '*'
         self.vis_color = colors.darker_sepia
         self.fog_color = colors.darkest_sepia
+        self.linking = True
         self.label = "dungeon"
 
-    def fog(self):
+    def entry(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '<'
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gra
+        self.linking = True
+        self.label = "entry"
+
+    def fog_wall(self):
         self.blocked = True
         self.block_sight = True
         self.char = chr(178)
-        self.vis_color = colors.dark_crimson
-        self.fog_color = colors.darker_crimson
-        self.label = "fog"
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
+        self.linking = False
+        self.label = "fog_wall"
+
+
+    def forest(self):
+        self.blocked = False
+        self.block_sight = True
+        self.char = chr(209)
+        self.vis_color = colors.dark_green
+        self.fog_color = colors.darker_green
+        self.linking = False
+        self.label = "forest"
+
+    def ladder(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = 'H'
+        self.vis_color = colors.dark_sepia
+        self.fog_color = colors.darker_sepia
+        self.linking = True
+        self.label = "ladder"
 
     def mountain(self):
         self.blocked = True
@@ -234,6 +321,7 @@ class Tile:
         self.char = '^'
         self.vis_color = colors.gray
         self.fog_color = colors.dark_gray
+        self.linking = False
         self.label = "mountain"
 
     def path(self):
@@ -242,15 +330,8 @@ class Tile:
         self.char = '.'
         self.vis_color = colors.darker_amber
         self.fog_color = colors.darkest_amber
+        self.linking = False
         self.label = "path"
-
-    def entry(self):
-        self.blocked = False
-        self.block_sight = False
-        self.char = '<'
-        self.vis_color = colors.gray
-        self.fog_color = colors.dark_gray
-        self.label = "entry"
 
     def plains(self):
         self.blocked = False
@@ -258,15 +339,26 @@ class Tile:
         self.char = chr(240)
         self.vis_color = colors.light_chartreuse
         self.fog_color = colors.chartreuse
+        self.linking = False
         self.label = "plains"
 
-    def water(self):
-        self.blocked = False
-        self.block_sight = False
-        self.char = chr(247)
-        self.vis_color = colors.blue
-        self.fog_color = colors.dark_blue
-        self.label = "water"
+    def red_fog(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = chr(178)
+        self.vis_color = colors.dark_crimson
+        self.fog_color = colors.darker_crimson
+        self.linking = False
+        self.label = "red_fog"
+
+    def stone_wall(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = chr(35)
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
+        self.linking = False
+        self.label = "stone_wall"
 
     def swamp(self):
         self.blocked = False
@@ -274,23 +366,90 @@ class Tile:
         self.char = chr(59)
         self.vis_color = colors.darker_gray
         self.fog_color = colors.darkest_gray
+        self.linking = False
         self.label = "swamp"
 
-    def desert(self):
+    def water(self):
         self.blocked = False
         self.block_sight = False
         self.char = chr(247)
-        self.vis_color = colors.yellow
-        self.fog_color = colors.desaturated_yellow
-        self.label = "desert"
+        self.vis_color = colors.blue
+        self.fog_color = colors.dark_blue
+        self.linking = False
+        self.label = "water"
 
-    def forest(self):
-        self.blocked = False
+
+class WeatherEffects:
+    def __init__(self, block_sight=False, char=None, vis_color=None, fog_color=None, label=None):
+        # all tiles start unexplored
+        self.explored = False
+        self.block_sight = block_sight
+        self.char = char
+        self.vis_color = vis_color
+        self.fog_color = fog_color
+        self.label = label
+
+    def darkness(self):
         self.block_sight = True
-        self.char = chr(209)
-        self.vis_color = colors.dark_green
-        self.fog_color = colors.darker_green
-        self.label = "forest"
+        self.char = chr(255)
+        self.vis_color = colors.black
+        self.fog_color = colors.black
+        self.label = "darkness"
+
+    def fire(self):
+        self.block_sight = True
+        self.char = chr(177)
+        self.vis_color = colors.red
+        self.fog_color = colors.dark_red
+        self.label = "fire"
+
+    def fog(self):
+        self.block_sight = True
+        self.char = chr(177)
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
+        self.label = "fog"
+
+    def light_fog(self):
+        self.block_sight = False
+        self.char = chr(176)
+        self.vis_color = colors.light_gray
+        self.fog_color = colors.gray
+        self.label = "light_fog"
+
+    # rain might alternate between 221 and 222
+    def rain(self):
+        self.block_sight = False
+        self.char = chr(176)
+        self.vis_color = colors.blue
+        self.fog_color = colors.dark_blue
+        self.label = "rain"
+
+    def heavy_rain(self):
+        self.block_sight = True
+        self.char = chr(177)
+        self.vis_color = colors.blue
+        self.fog_color = colors.dark_blue
+        self.label = "heavy_rain"
+
+
+    def change_weather(self, new_weather):
+        getattr(self, new_weather)()
+
+        '''
+        self.block_sight = new_weather.block_sight
+        self.char = new_weather.char
+        self.vis_color = new_weather.vis_color
+        self.fog_color = new_weather.fog_color
+        self.label = new_weather.label
+        '''
+
+    def remove_weather(self):
+        self.block_sight = False
+        self.char = None
+        self.vis_color = None
+        self.fog_color = None
+        self.label = None
 
 
 class Player:
@@ -897,6 +1056,12 @@ def occupied(x, y):
             return obj
     return None
 
+def adjacent_to(x, y, obj):
+    if obj.distance(x, y) <= 2:
+        return True
+    else:
+        return False
+
 
 def pick_up():
     for obj in objects:
@@ -908,7 +1073,7 @@ def pick_up():
 # player interactions functions
 ############################################
 def handle_keys():
-    global fov_recompute, game_state, mouse_coord, last_button
+    global fov_recompute, game_state, mouse_coord, last_button, map_tiles
 
     keypress = False
     for event in tdl.event.get():
@@ -928,9 +1093,7 @@ def handle_keys():
     elif user_input.key == 'ESCAPE':
         # game menu
         choice = menu('Game Menu', ['Exit Game', 'Character Screen', 'Help'], 24)
-        print(choice)
         if choice is 0:
-            print(choice)
             double_check = menu('Are you sure?', ['No', 'Yes'], 24)
             if double_check:
                 exit()
@@ -1011,6 +1174,10 @@ def handle_keys():
 
             elif user_input.text == '<':
                 exit_location(player.x, player.y)
+            elif user_input.text == 'E':
+                # open edit mode
+                message("Entering edit mode! Current tile order: " + str(map_tiles), colors.light_azure)
+                game_state = 'edit'
 
 
 def get_names_under_mouse():
@@ -1038,7 +1205,6 @@ def inventory_menu():
 
 # Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
 def equip_or_unequip(index):
-    print(index)
     item_choice = inventory_menu()
     if item_choice is not None:
         item = player.fighter.inventory[item_choice]
@@ -1132,11 +1298,11 @@ def make_world_map():
 
     # Create fog border around map
     for i in range(MAP_WIDTH):
-        world_map[i][0].fog()
-        world_map[i][MAP_HEIGHT - 1].fog()
+        world_map[i][0].red_fog()
+        world_map[i][MAP_HEIGHT - 1].red_fog()
     for j in range(MAP_HEIGHT):
-        world_map[0][j].fog()
-        world_map[MAP_WIDTH - 1][j].fog()
+        world_map[0][j].red_fog()
+        world_map[MAP_WIDTH - 1][j].red_fog()
 
     # Add other tiles
     world_map[1][1].path()
@@ -1166,37 +1332,38 @@ def make_world_map():
     world_map[3][3].mountain()
     world_map[3][4].path()
     world_map[3][5].mountain()
-    world_map[3][6].fog()
+    world_map[3][6].red_fog()
 
     world_map[4][1].mountain()
     world_map[4][2].path()
     world_map[4][3].mountain()
     world_map[4][4].path()
     world_map[4][5].mountain()
-    world_map[4][6].fog()
+    world_map[4][6].red_fog()
 
     world_map[5][1].path()
     world_map[5][2].mountain()
     world_map[5][3].mountain()
     world_map[5][4].path()
     world_map[5][5].mountain()
-    world_map[5][6].fog()
+    world_map[5][6].red_fog()
 
     world_map[6][1].mountain()
     world_map[6][2].path()
     world_map[6][3].dungeon()
     world_map[6][4].mountain()
     world_map[6][5].mountain()
-    world_map[6][6].fog()
+    world_map[6][6].red_fog()
 
     world_map[7][1].mountain()
     world_map[7][2].mountain()
     world_map[7][3].mountain()
     world_map[7][4].mountain()
-    world_map[7][5].fog()
-    world_map[7][6].fog()
+    world_map[7][5].red_fog()
+    world_map[7][6].red_fog()
 
-    change_map(world_map, "world")
+    #change_map(world_map, "world")
+    load_map(map_num)
 
 
 def generate_city():
@@ -1274,14 +1441,17 @@ def exit_location(x, y):
         change_map(old_map, "world")
 
 
-def change_map(new_map, label):
-    global current_map, old_map, fov_recompute, map_changed
+def change_map(new_map, weather, label):
+    global current_map, old_map, fov_recompute, map_changed, weather_map, map_label
 
     if current_map:
         old_map = current_map
     current_map = new_map
+    weather_map = weather
     fov_recompute = True
     map_changed = True
+    map_label = label
+
     change_player_location(label)
     objects = []
     objects.append(player)
@@ -1302,7 +1472,6 @@ def change_player_location(map_label):
                 player.x = MAP_WIDTH // 2
                 player.y = 0
             elif last_button is '3':
-                print("button is 3")
                 current_map[0][0].entry()
                 player.x = 0
                 player.y = 0
@@ -1326,8 +1495,86 @@ def change_player_location(map_label):
                 current_map[0][MAP_HEIGHT - 1].entry()
                 player.x = 0
                 player.y = MAP_HEIGHT - 1
-        elif map_label is "world":
+        else:
             player.x, player.y = entry_coords
+
+
+def load_map(map_num):
+    map_name = "map" + str(map_num)
+    try:
+        level = getattr(maps, map_name)
+    except AttributeError:
+        print(map_num, "load_map()")
+        quit_game()
+    change_map(*load_map_from_file(map_num))
+    #change_map(*read_level(level))
+
+
+def read_level(level_dict):
+    global tile_types, weather_types, level_map, weather_map, map_tiles, map_weather_types
+    level_map = [[Tile(False)
+                    for y in range(MAP_HEIGHT)]
+                    for x in range(MAP_WIDTH)]
+    weather_map = [[WeatherEffects()
+                    for y in range(MAP_HEIGHT)]
+                    for x in range(MAP_WIDTH)]
+
+    for item in level_dict:
+        if item in tile_types:
+            map_tiles.append(item)
+        elif item in weather_types:
+            map_weather_types.append(item)
+
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            getattr(level_map[x][y], level_dict['bg'])()
+
+    for tile_type in map_tiles:
+        if len(level_dict[tile_type]) > 0:
+            for coord_range in level_dict[tile_type]:
+                for y in range(coord_range[0][1], coord_range[1][1] + 1):
+                    for x in range(coord_range[0][0], coord_range[1][0] + 1):
+                        getattr(level_map[x][y], tile_type)()
+
+    for weather_type in map_weather_types:
+        if len(level_dict[weather_type]) > 0:
+            for coord_range in level_dict[weather_type]:
+                for y in range(coord_range[0][1], coord_range[1][1] + 1):
+                    for x in range(coord_range[0][0], coord_range[1][0] + 1):
+                        getattr(weather_map[x][y], weather_type)()
+
+    return(level_map, weather_map, level_dict['label'])
+
+
+def load_map_from_file(map_num):
+    global tile_types, weather_types, level_map, weather_map, map_tiles, map_weather_types
+
+    level_map = [[Tile(False)
+                    for y in range(MAP_HEIGHT)]
+                    for x in range(MAP_WIDTH)]
+    weather_map = [[WeatherEffects()
+                    for y in range(MAP_HEIGHT)]
+                    for x in range(MAP_WIDTH)]
+
+    count = 0
+    file_name = "map" + str(map_num) + ".txt"
+    with open(file_name) as f:
+        for line in f.readlines():
+            if count == 1:
+                map_label = line
+            elif count == 4:
+                map_tiles = ast.literal_eval(line)
+            elif count >= 7:
+                line = line.replace('\n', '')
+                content = line.split(':')
+                if count < 3807:
+                    if int(content[0]) != -1:
+                        getattr(level_map[int(content[1])][int(content[2])], map_tiles[int(content[0])])()
+                elif count >= 3810:
+                    getattr(level_map[int(content[0])][int(content[1])], "linked_map_num", content[2])
+            count += 1
+
+    return(level_map, weather_map, map_label)
 
 
 ############################################
@@ -1357,12 +1604,14 @@ def random_choice_index(chances):
         choice += 1
 
 
+# TODO: implement weather effects 
 def render_all():
     global fov_recompute
     global visible_tiles
     global player
     global current_map
     global map_changed
+    global weather_map
 
     if map_changed:
         map_changed = False
@@ -1380,10 +1629,24 @@ def render_all():
                     # if it's not visible right now, the player can only see it if it's explored
                     if current_map[x][y].explored:
                         con.draw_char(x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=None)
+
+                        # render weather of tiles outside fov
+                        #weather_map[x][y].fog()
+                        #con.draw_char(x, y, weather_map[x][y].char, weather_map[x][y].fog_color, bg=None)
                     else:
                         con.draw_char(x, y, None, None, bg=None)
                 else:
                     con.draw_char(x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=None)
+
+                    # render weather effects on visible tiles
+                    if not adjacent_to(x, y, player):
+                        if weather_map[x][y].label == "fog":
+                            #weather_map[x][y].light_fog()
+                            pass
+                        #con.draw_char(x, y, weather_map[x][y].char, weather_map[x][y].vis_color, bg=None)
+                    else:
+                        con.draw_char(x, y, None, None, bg=None)
+
                     # since it's visible, explore it
                     current_map[x][y].explored = True
 
@@ -1410,7 +1673,8 @@ def render_all():
                colors.light_red, colors.darker_red)
 
     # display names of objects under the mouse
-    panel.draw_str(1, 0, get_names_under_mouse(), bg=None, fg=colors.light_gray)
+    if mouse_coord:
+        panel.draw_str(1, 0, get_names_under_mouse(), bg=None, fg=colors.light_gray)
 
     # blit the contents of "panel" to the root console
     root.blit(panel, 0, PANEL_Y, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0)
@@ -1444,8 +1708,161 @@ def update_queue():
 
 
 ############################################
-# intro screen functions
+# developer functions
 ############################################
+def edit_mode():
+    global current_map, objects, game_state, fov_recompute, map_tiles, fill_mode
+
+    click_coords = False
+    keypress = False
+    right_click_flag = False
+    for event in tdl.event.get():
+        if event.type == 'KEYDOWN':
+            user_input = event
+            keypress = True
+        if event.type == 'MOUSEDOWN':
+            if event.button == 'RIGHT':
+                right_click_flag = True
+            click_coords = event.cell
+    if keypress:
+        if user_input.text == 'E':
+            game_state = 'playing'
+            message("Leaving edit mode!", colors.light_azure)
+            return
+        elif user_input.text == 'S':
+            message("Saving map...", colors.azure)
+            save_map()
+        elif user_input.text == 'F':
+            if not fill_mode:
+                message('Click group of tiles to fill.', colors.light_red)
+                fill_mode = True
+            else:
+                message('Leaving fill mode.', colors.light_red)
+                fill_mode = False
+        elif user_input.text == 'Q':
+            sys.exit()
+
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            if click_coords:
+                if x == click_coords[0] and y == click_coords[1]:
+                    if fill_mode:
+                        fill_area(current_map[x][y].label, x, y)
+                    else:
+                        if current_map[x][y].label in map_tiles:
+                            if not right_click_flag:
+                                if map_tiles.index(current_map[x][y].label) + 1 < len(map_tiles):
+                                    getattr(current_map[x][y], map_tiles[map_tiles.index(current_map[x][y].label) + 1])()
+                                else:
+                                    getattr(current_map[x][y], map_tiles[0])()
+                            else:
+                                if map_tiles.index(current_map[x][y].label) - 1 >= 0:
+                                    getattr(current_map[x][y], map_tiles[map_tiles.index(current_map[x][y].label) - 1])()
+                                else:
+                                    getattr(current_map[x][y], map_tiles[len(map_tiles) - 1])()
+                        else:
+                            getattr(current_map[x][y], map_tiles[0])()
+
+    fov_recompute = True
+
+
+def save_map():
+    global current_map, objects, map_num, map_tiles, map_label
+
+    map_file = open("map" + str(map_num) + ".txt", "w")
+    map_file.write("[MAP LABEL]\n")
+    map_file.write(map_label + "\n")
+    map_file.write("[TILESET]\n")
+    map_file.write(str(map_tiles) + "\n\n")
+    map_file.write("[MAP DATA]\n")
+
+    for x in range(MAP_WIDTH):
+        for y in range(MAP_HEIGHT):
+            if current_map[x][y].label is not None:
+                map_file.write(str(map_tiles.index(current_map[x][y].label)))
+            else:
+                map_file.write('-1')
+            map_file.write(':' + str(x) + ':' + str(y))
+            map_file.write("\n")
+
+    map_file.write("\n")
+
+    map_file.write("[MAP LINKS]\n")
+    for x in range(MAP_WIDTH):
+        for y in range(MAP_HEIGHT):
+            if current_map[x][y].linking:
+                if current_map[x][y].linked_map_num is not None:
+                    linked_map_num = current_map[x][y].linked_map_num
+                else:
+                    linked_map_num = None
+                    while linked_map_num is None:
+                        try:
+                            input_str = link_tiles(x, y)
+                            linked_map_num = int(input_str)
+                        except(ValueError):
+                            message("Input of " + input_str + " cannot be converted to a number. Please try again.", colors.red)
+                    message("The number you selected was " + input_str + ".", colors.azure)
+                map_file.write(str(x) + ':' + str(y) + ':' + str(linked_map_num))
+                map_file.write("\n")
+
+    map_file.close()
+
+    message("Map saved!", colors.azure)
+
+
+def fill_area(target_type, x, y):
+    global current_map, map_tiles, max_recurse_flag
+
+    replacement_type = menu('Fill are with which tile?', map_tiles, 24)
+    if replacement_type is None:
+        return
+    elif replacement_type == current_map[x][y].label:
+        return
+    else:
+        flood_fill(x, y, target_type, map_tiles[replacement_type])
+        if max_recurse_flag:
+            message("Reached maximum recursion depth, please fill additional areas seprately.", colors.dark_red)
+
+
+def flood_fill(x, y, target_type, replacement_type):
+    global current_map, recurse_count, max_recurse_flag
+    if recurse_count > MAX_RECURSE:
+        max_recurse_flag = True
+        return
+    if x >= MAP_WIDTH or x < 0:
+        return
+    if y >= MAP_HEIGHT or y < 0:
+        return
+    if current_map[x][y].label == replacement_type:
+        return
+    elif current_map[x][y].label != target_type:
+        return
+    recurse_count += 1
+    getattr(current_map[x][y], replacement_type)()
+    flood_fill(x, y+1, target_type, replacement_type) # south
+    flood_fill(x, y-1, target_type, replacement_type) # north
+    flood_fill(x+1, y, target_type, replacement_type) # east
+    flood_fill(x-1, y, target_type, replacement_type) # west
+    recurse_count -= 1
+    return
+
+
+def link_tiles(x, y):
+    global current_map
+
+    message("The tile at (" + str(x) + ", " + str(y) + ") (" + current_map[x][y].label +
+                ") is not linked. Please enter the number of the map you wish to link it to and press enter.", colors.orange)
+    num_str = ""
+    user_input = tdl.event.key_wait()
+    while user_input.key != 'ENTER':
+        num_str += user_input.char
+        user_input = tdl.event.key_wait()
+    return num_str
+
+
+############################################
+# intro screen functions
+############################################()
 def main_menu():
     # img = libtcod.image_load('menu_background2.png')
     game_state = 'menu'
@@ -1469,7 +1886,7 @@ def main_menu():
 
 
 def new_game():
-    global player, game_msgs, game_state
+    global player
 
     # first create the player out of its components
     player_comp = Player()
@@ -1485,8 +1902,6 @@ def new_game():
     # generate world map (at this point it's not drawn to the screen)
     make_world_map()
 
-    game_state = 'playing'
-
     # a warm welcoming message!
     message('You awaken with a burning desire to act. You feel as if you should recognize this place.', colors.red)
 
@@ -1501,6 +1916,7 @@ def new_game():
 
 
 def play_game():
+    global game_state
     # player_action = None
     game_state = 'playing'
 
@@ -1511,7 +1927,13 @@ def play_game():
         tdl.flush()
 
         # handle keys and exit game if needed
-        player_action = handle_keys()
+        if game_state == 'edit':
+            edit_mode()
+        else:
+            player_action = handle_keys()
+
+        
+
         if player_action == 'exit':
             break
 
@@ -1542,12 +1964,26 @@ root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT // 2 - 10, 'By Jerezereh')
 objects = []  # everything in the game that isn't a tile
 game_msgs = []  # buffer of the messages that appear on the screen
 last_button = ''
-entry_coords = (1, 1)
+entry_coords = (12, 24)
 
 fov_recompute = True
 player_action = None
 mouse_coord = (0, 0)
 
-current_map = False
+map_num = 0
+current_map = []
+weather_map = []
+level_map = []
+map_tiles = []
+map_weather_types = []
+map_label = ""
+fill_mode = False
+recurse_count = 0
+max_recurse_flag = False
+
+
+tile_types = ["bird_nest", "cave_floor", "city", "desert", "dirt", "dungeon", "entry", "forest", "ladder",
+                "mountain", "path", "plains", "red_fog", "stone_wall", "swamp", "water"]
+weather_types = ["darkness", "fire", "fog", "light_fog", "rain", "heavy_rain"]
 
 main_menu()
