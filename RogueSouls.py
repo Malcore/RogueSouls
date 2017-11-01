@@ -1,12 +1,14 @@
 import tdl
 import colors
-import random
 import math
 import textwrap
 import sys
+import os
 import ast
+import shelve
+import datetime
+import re
 import dictionaries as dicts
-import maps
 
 # Global variables
 LIMIT_FPS = 30
@@ -41,7 +43,7 @@ LEVEL_UP_FACTOR = 30
 # fov constants
 FOV_ALGO = 'BASIC'
 FOV_LIGHT_WALLS = True
-WORLD_FOV_RAD = 3
+WORLD_FOV_RAD = 4
 TORCH_RADIUS = 10
 
 # combat variables
@@ -61,6 +63,8 @@ MOVE_SPEED = 20
 TURN_SPEED = 10
 # number of frames that a character is invulnerable while dodging
 DODGE_TIME = 8
+
+MAX_ACTION_BUFFER = 10
 ########################################################################################################################
 # Major TODOs                                                                                                          #
 ########################################################################################################################
@@ -77,6 +81,7 @@ DODGE_TIME = 8
 # TODO: level-up systems
 # TODO: crafting systems?
 # TODO: Dark Cloud style world building?
+# TODO: Map-to-image printer?
 ########################################################################################################################
 
 
@@ -106,17 +111,22 @@ class Object:
             self.player.owner = self
 
     def move(self, dx, dy):
-        global fov_recompute, current_map, map_num
+        global fov_recompute, current_map
         # move by the given amount
         if self.x + dx > MAP_WIDTH - 1 or self.x + dx < 0:
             return
         elif self.y + dy > MAP_HEIGHT - 1 or self.y + dy < 0:
             return
+        if current_map[self.x + dx][self.y + dy].interact(self):
+            fov_recompute = True
+            return
         if not is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
             if current_map[self.x][self.y].linking:
-                load_map(current_map[self.x][self.y].linked_map_num)
+                change_level(self.x, self.y)
+            elif current_map[self.x][self.y].label == "abyss":
+                player.fighter.death()
         if self.player:
             fov_recompute = True
 
@@ -184,11 +194,13 @@ class Equipment:
 
 class Tile:
     # a tile of the map and its properties
-    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, linking=False, linked_map_num = None, label=None):
+    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, linking=False, 
+        linked_map_num = None, label=None, bg=None, dark_bg=None, player_interaction=None, fighter_interaction=None,
+        obj_interaction=None):
         self.blocked = blocked
 
         # all tiles start unexplored
-        self.explored = True
+        self.explored = False
 
         # by default, if a tile is blocked, it also blocks sight
         if blocked is None:
@@ -203,9 +215,47 @@ class Tile:
         # delcares which map tile is linked to
         self.linked_map_num = linked_map_num
         self.label = label
+        self.bg = bg
+        self.dark_bg = dark_bg
+        self.player_interaction = player_interaction
+        self.fighter_interaction = fighter_interaction
+        self.obj_interaction = obj_interaction
+        self.open = False
+
+    def interact(self, obj):
+        if obj.player is not None:
+            if self.player_interaction is not None:
+                return getattr(self, self.player_interaction)()
+        elif obj.fighter is not None:
+            if self.fighter_interaction is not None:
+                return getattr(self, self.fighter_interaction)()
+        elif obj is not None:
+            if self.obj_interaction is not None:
+                return getattr(self, self.obj_interaction)()
+        else:
+            return False
+
+    def open_tile(self):
+        # used to toggle open/closed state of doors, chests, etc.
+        if not self.open:
+            self.open = True
+            message("You open the door...", colors.dark_green)
+            getattr(self, self.label)()
+            return True
+        else:
+            return False
 
         # Tile types, calling a function will set the tile to that type
         # Current total: 19
+    def default(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = None
+        self.vis_color = colors.black
+        self.fog_color = colors.black
+        self.linking = False
+        self.label = "default"
+
     def abyss(self):
         self.blocked = False
         self.block_sight = False
@@ -264,10 +314,42 @@ class Tile:
         self.blocked = False
         self.block_sight = False
         self.char = '.'
-        self.vis_color = colors.darker_amber
-        self.fog_color = colors.darkest_amber
+        self.vis_color = colors.shingle_fawn
+        self.fog_color = colors.west_coast
         self.linking = False
         self.label = "dirt"
+        self.bg = None #colors.light_gray
+        self.dark_bg = None #colors.gray
+
+    def door_vert(self):
+        if self.open:
+            self.char = '+'
+            self.blocked = False
+            self.block_sight = False
+        else:
+            self.char = '\u2225'
+            self.blocked = True
+            self.block_sight = True
+        self.vis_color = colors.dark_sepia
+        self.fog_color = colors.darker_sepia
+        self.linking = False
+        self.label = "door_vert"
+        self.player_interaction = 'open_tile'
+
+    def door_hor(self):
+        if self.open:
+            self.char = '+'
+            self.blocked = False
+            self.block_sight = False
+        else:
+            self.char = '='
+            self.blocked = True
+            self.block_sight = True
+        self.vis_color = colors.dark_sepia
+        self.fog_color = colors.darker_sepia
+        self.linking = False
+        self.label = "door_hor"
+        self.player_interaction = 'open_tile'
 
     def dungeon(self):
         self.blocked = False
@@ -283,19 +365,24 @@ class Tile:
         self.block_sight = False
         self.char = '<'
         self.vis_color = colors.gray
-        self.fog_color = colors.dark_gra
+        self.fog_color = colors.dark_gray
         self.linking = True
         self.label = "entry"
 
     def fog_wall(self):
-        self.blocked = True
+        self.blocked = False
         self.block_sight = True
-        self.char = chr(178)
-        self.vis_color = colors.gray
-        self.fog_color = colors.dark_gray
+        if self.open:
+            self.char = '.'
+        else:
+            self.char = '\u203b'
+            self.bg = colors.light_gray
+            self.dark_bg = colors.gray
+        self.vis_color = colors.dark_gray
+        self.fog_color = colors.darker_gray
         self.linking = False
         self.label = "fog_wall"
-
+        self.player_interaction = 'open_tile'
 
     def forest(self):
         self.blocked = False
@@ -315,6 +402,28 @@ class Tile:
         self.linking = True
         self.label = "ladder"
 
+    def marble_floor(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '.'
+        self.vis_color = colors.dark_port_gore
+        self.fog_color = colors.black
+        self.linking = False
+        self.label = "marble_floor"
+        self.bg = colors.lighter_gray
+        self.dark_bg = colors.light_gray
+
+    def monument(self):
+        self.blocked = True
+        self.block_sight = False
+        self.char = '#'
+        self.vis_color = colors.gold
+        self.fog_color = colors.golden_tips
+        self.linking = False
+        self.label = "monument"
+        self.bg = colors.light_gray
+        self.dark_bg = colors.gray
+
     def mountain(self):
         self.blocked = True
         self.block_sight = True
@@ -323,6 +432,15 @@ class Tile:
         self.fog_color = colors.dark_gray
         self.linking = False
         self.label = "mountain"
+
+    def overgrowth(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = '#'
+        self.vis_color = colors.desaturated_green
+        self.fog_color = colors.desaturated_amber
+        self.linking = False
+        self.label = "overgrowth"
 
     def path(self):
         self.blocked = False
@@ -351,14 +469,52 @@ class Tile:
         self.linking = False
         self.label = "red_fog"
 
+    def stairs_up(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u2344'
+        self.vis_color = colors.old_copper
+        self.fog_color = colors.punga
+        self.linking = True
+        self.label = "stairs_up"
+
+    def stairs_down(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u2343'
+        self.vis_color = colors.old_copper
+        self.fog_color = colors.punga
+        self.linking = True
+        self.label = "stairs_down"
+
+    def stone_stairs_up(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u2344'
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
+        self.linking = True
+        self.label = "stone_stairs_up"
+
+    def stone_stairs_down(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u2343'
+        self.vis_color = colors.gray
+        self.fog_color = colors.dark_gray
+        self.linking = True
+        self.label = "stone_stairs_down"
+
     def stone_wall(self):
         self.blocked = True
         self.block_sight = True
-        self.char = chr(35)
+        self.char = '#'
         self.vis_color = colors.gray
         self.fog_color = colors.dark_gray
         self.linking = False
         self.label = "stone_wall"
+        self.bg = colors.light_gray
+        self.dark_bg = colors.gray
 
     def swamp(self):
         self.blocked = False
@@ -369,14 +525,61 @@ class Tile:
         self.linking = False
         self.label = "swamp"
 
+    def tree(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = '\u219F'
+        self.vis_color = colors.dark_green
+        self.fog_color = colors.darker_green
+        self.linking = False
+        self.label = "tree"
+        self.bg = None
+        self.dark_bg = None
+
     def water(self):
         self.blocked = False
         self.block_sight = False
-        self.char = chr(247)
+        self.char = '\u2652'
         self.vis_color = colors.blue
         self.fog_color = colors.dark_blue
         self.linking = False
         self.label = "water"
+
+    def waterfall(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u2591'
+        self.vis_color = colors.blue
+        self.fog_color = colors.dark_blue
+        self.linking = False
+        self.label = "waterfall"
+
+    def wooden_bridge(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u2630'
+        self.vis_color = colors.shingle_fawn
+        self.fog_color = colors.west_coast
+        self.linking = False
+        self.label = "wooden_bridge"
+
+    def wooden_floor(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '.'
+        self.vis_color = colors.shingle_fawn
+        self.fog_color = colors.west_coast
+        self.linking = False
+        self.label = "wooden_floor"
+
+    def wooden_wall(self):
+        self.blocked = True
+        self.block_sight = True
+        self.char = '#'
+        self.vis_color = colors.shingle_fawn
+        self.fog_color = colors.west_coast
+        self.linking = False
+        self.label = "wooden_wall"
 
 
 class WeatherEffects:
@@ -885,6 +1088,7 @@ def message(new_msg, color=colors.white):
 
         # add the new lines as a tuple, with text and color
         game_msgs.append((line, color))
+    render_gui()
 
 
 def menu(header, options, width):
@@ -936,6 +1140,8 @@ def menu(header, options, width):
     if 0 <= index < len(options):
         return index
     return None
+
+#TODO: full-screen menus
 
 
 def msgbox(text, width=0):
@@ -1070,114 +1276,271 @@ def pick_up():
 
 
 ############################################
-# player interactions functions
+# charater interaction functions
 ############################################
-def handle_keys():
-    global fov_recompute, game_state, mouse_coord, last_button, map_tiles
+def close_doors(x, y):
+    global current_map
+
+    if current_map[x-1][y-1].label in door_tiles:
+        dx = -1
+        dy = -1
+    elif current_map[x][y-1].label in door_tiles:
+        dx = 0
+        dy = -1
+    elif current_map[x+1][y-1].label in door_tiles:
+        dx = 1
+        dy = -1
+    elif current_map[x+1][y].label in door_tiles:
+        dx = 1
+        dy = 0
+    elif current_map[x+1][y+1].label in door_tiles:
+        dx = 1
+        dy = 1
+    elif current_map[x][y+1].label in door_tiles:
+        dx = 0
+        dy = 1
+    elif current_map[x-1][y+1].label in door_tiles:
+        dx = -1
+        dy = 1
+    elif current_map[x-1][y].label in door_tiles:
+        dx = -1
+        dy = 0
+    if current_map[x + dx][y + dy].open:
+        current_map[x + dx][y + dy].open = False
+        getattr(current_map[x + dx][y + dy], current_map[x + dx][y + dy].label)()
+        message("You close the door...", colors.darker_green)
+
+############################################
+# player interaction functions
+############################################
+def handle_keys(command=None):
+    global fov_recompute, game_state, mouse_coord, last_button, map_tiles, fill_mode, right_click_flag, map_num
 
     keypress = False
+    right_click_flag = False
+    click_coords = None
     for event in tdl.event.get():
         if event.type == 'KEYDOWN':
             user_input = event
             keypress = True
         if event.type == 'MOUSEMOTION':
             mouse_coord = event.cell
+        if event.type == 'MOUSEDOWN':
+            if event.button == 'RIGHT':
+                right_click_flag = True
+            click_coords = event.cell
 
-    if not keypress:
+    if game_state == 'simulating':
+        keypress = True
+        user_input = simulate_key(command)
+
+    if game_state == 'editing':
+        if click_coords:
+            edit_mode(click_coords)
+
+    if keypress:
+        fov_recompute = True
+        if user_input.key == 'ENTER' and user_input.alt:
+            # Alt+Enter: toggle fullscreen
+            tdl.set_fullscreen(not tdl.get_fullscreen())
+
+        elif user_input.key == 'ESCAPE':
+            # game menu
+            choice = menu('Game Menu', ['Main Menu', 'Character Screen', 'Help'], 24)
+            if choice is 0:
+                double_check = menu('Are you sure?', ['No', 'Yes'], 24)
+                if double_check:
+                    save_game()
+                    main_menu()
+                else:
+                    return
+            elif choice is 1:
+                # TODO: add character screen
+                message("Not yet implemented")
+                return
+            elif choice is 2:
+                # TODO: add help screen
+                message("Not yet implemented")
+                return
+
+        if game_state == 'playing' or game_state == 'simulating':
+            # movement keys
+            if user_input.key == 'UP' or user_input.text == '8':
+                player.move(0, -1)
+                last_button = '8'
+                return "MV N"
+
+            elif user_input.key == 'DOWN' or user_input.text == '2':
+                player.move(0, 1)
+                last_button = '2'
+                return "MV S"
+
+            elif user_input.key == 'LEFT' or user_input.text == '4':
+                player.move(-1, 0)
+                last_button = '4'
+                return "MV W"
+
+            elif user_input.key == 'RIGHT' or user_input.text == '6':
+                player.move(1, 0)
+                last_button = '6'
+                return "MV E"
+
+            elif user_input.key == 'TEXT':
+                if user_input.text == '7':
+                    player.move(-1, -1)
+                    last_button = '7'
+                    return "MV NW"
+
+                elif user_input.text == '9':
+                    player.move(1, -1)
+                    last_button = '9'
+                    return "MV NE"
+
+                elif user_input.text == '1':
+                    player.move(-1, 1)
+                    last_button = '1'
+                    return "MV SW"
+
+                elif user_input.text == '3':
+                    player.move(1, 1)
+                    last_button = '3'
+                    return "MV SE"
+
+                elif user_input.text =='5':
+                    player.move(0, 0)
+                    last_button = '5'
+                    return "WAIT"
+
+                elif user_input.text == 'i':
+                    choice = inventory_menu()
+                    if choice is not None and choice < len(player.fighter.inventory):
+                        item = player.fighter.inventory[choice]
+                        player.fighter.equip(item.item.equipment)
+
+                elif user_input.text == 'e':
+                    equip_or_unequip(equipment_menu())
+
+                # force quit key?
+                elif user_input.text == 'Q':
+                    quit_game()
+
+                elif user_input.text == 'd':
+                    drop_menu()
+
+                elif user_input.text == ',':
+                    player.fighter.handle_attack_move("left", "special")
+
+                elif user_input.text == '.':
+                    player.fighter.handle_attack_move("right", "special")
+
+                elif user_input.text == 'k':
+                    player.fighter.handle_attack_move("left", "normal")
+
+                elif user_input.text == 'l':
+                    player.fighter.handle_attack_move("right", "normal")
+
+                elif user_input.text == '>':
+                    enter_location(player.x, player.y)
+
+                elif user_input.text == '<':
+                    exit_location(player.x, player.y)
+                elif user_input.text == 'E':
+                    # open edit mode
+                    message("Entering edit mode! Current tile order: " + str(map_tiles), colors.light_azure)
+                    for y in range(MAP_HEIGHT):
+                        for x in range(MAP_WIDTH):
+                            current_map[x][y].explored = True
+                    game_state = 'editing'
+                    edit_mode()
+                elif user_input.text == 'S':
+                    if not debug_flag:
+                        save_game()
+                    message("Game saved!", colors.green)
+                elif user_input.text == 'c':
+                    close_doors(player.x, player.y)
+
+        elif game_state == 'editing':
+            if user_input.text == 'E':
+                game_state = 'playing'
+                fill_mode = False
+                message("Leaving edit mode!", colors.light_azure)
+            elif user_input.text == 'S':
+                message("Saving map...", colors.azure)
+                save_map()
+            elif user_input.text == 'F':
+                if not fill_mode:
+                    message('Click group of tiles to fill.', colors.light_red)
+                    fill_mode = True
+                else:
+                    message('Leaving fill mode.', colors.light_red)
+                    fill_mode = False
+            elif user_input.text == 'Q':
+                quit_game()
+            elif user_input.text == 'N':
+                new_map(int(map_num) + 1)
+            elif user_input.text == 'R':
+                choice = menu('Which tile to remove from map?', map_tiles, 24)
+                if choice is not None:
+                    if choice < len(map_tiles):
+                        map_tiles.remove(map_tiles[choice])
+            elif user_input.key == 'PAGEUP':
+                temp_map_num = int(map_num) + 1
+                try:
+                    load_map(temp_map_num)
+                except AttributeError:
+                    message("Map" + temp_map_num +".txt is empty and could not be loaded!", colors.red)
+                else:
+                    map_num = temp_map_num
+            elif user_input.key == 'PAGEDOWN':
+                temp_map_num = int(map_num) - 1
+                try:
+                    load_map(temp_map_num)
+                except AttributeError:
+                    message("Map" + temp_map_num +".txt is empty and could not be loaded!", colors.red)
+                else:
+                    map_num = temp_map_num
+    else:
         return 'didnt-take-turn'
 
-    if user_input.key == 'ENTER' and user_input.alt:
-        # Alt+Enter: toggle fullscreen
-        tdl.set_fullscreen(not tdl.get_fullscreen())
 
-    elif user_input.key == 'ESCAPE':
-        # game menu
-        choice = menu('Game Menu', ['Exit Game', 'Character Screen', 'Help'], 24)
-        if choice is 0:
-            double_check = menu('Are you sure?', ['No', 'Yes'], 24)
-            if double_check:
-                exit()
-            else:
-                return
-        elif choice is 1:
-            # TODO: add character screen
-            return
-        elif choice is 2:
-            # TODO: add help screen
-            return
-
-    if game_state == 'playing':
-        # movement keys
-        if user_input.key == 'UP' or user_input.text == '8':
-            player.move(0, -1)
-            last_button = '8'
-
-        elif user_input.key == 'DOWN' or user_input.text == '2':
-            player.move(0, 1)
-            last_button = '2'
-
-        elif user_input.key == 'LEFT' or user_input.text == '4':
-            player.move(-1, 0)
-            last_button = '4'
-
-        elif user_input.key == 'RIGHT' or user_input.text == '6':
-            player.move(1, 0)
-            last_button = '6'
-
-        elif user_input.key == 'TEXT':
-            if user_input.text == '7':
-                player.move(-1, -1)
-                last_button = '7'
-
-            elif user_input.text == '9':
-                player.move(1, -1)
-                last_button = '9'
-
-            elif user_input.text == '1':
-                player.move(-1, 1)
-                last_button = '1'
-
-            elif user_input.text == '3':
-                player.move(1, 1)
-                last_button = '3'
-
-            elif user_input.text == 'i':
-                choice = inventory_menu()
-                if choice is not None and choice < len(player.fighter.inventory):
-                    item = player.fighter.inventory[choice]
-                    player.fighter.equip(item.item.equipment)
-
-            elif user_input.text == 'e':
-                equip_or_unequip(equipment_menu())
-
-            # force quit key?
-            elif user_input.text == 'Q':
-                exit()
-
-            elif user_input.text == 'd':
-                drop_menu()
-
-            elif user_input.text == ',':
-                player.fighter.handle_attack_move("left", "special")
-
-            elif user_input.text == '.':
-                player.fighter.handle_attack_move("right", "special")
-
-            elif user_input.text == 'k':
-                player.fighter.handle_attack_move("left", "normal")
-
-            elif user_input.text == 'l':
-                player.fighter.handle_attack_move("right", "normal")
-
-            elif user_input.text == '>':
-                enter_location(player.x, player.y)
-
-            elif user_input.text == '<':
-                exit_location(player.x, player.y)
-            elif user_input.text == 'E':
-                # open edit mode
-                message("Entering edit mode! Current tile order: " + str(map_tiles), colors.light_azure)
-                game_state = 'edit'
+def simulate_key(command):
+    user_input = tdl.event.KeyDown(key='', text='')
+    if command == "MV N":
+        user_input.key = 'TEXT'
+        user_input.text = u'8'
+        return user_input
+    if command == "MV NE":
+        user_input.key = 'TEXT'
+        user_input.text = u'9'
+        return user_input
+    if command == "MV E":
+        user_input.key = 'TEXT'
+        user_input.text = u'6'
+        return user_input
+    if command == "MV SE":
+        user_input.key = 'TEXT'
+        user_input.text = u'3'
+        return user_input
+    if command == "MV S":
+        user_input.key = 'TEXT'
+        user_input.text = u'2'
+        return user_input
+    if command == "MV SW":
+        user_input.key = 'TEXT'
+        user_input.text = u'1'
+        return user_input
+    if command == "MV W":
+        user_input.key = 'TEXT'
+        user_input.text = u'4'
+        return user_input
+    if command == "MV NW":
+        user_input.key = 'TEXT'
+        user_input.text = u'7'
+        return user_input
+    if command == "WAIT":
+        user_input.key = 'TEXT'
+        user_input.text = u'5'
+        return user_input
 
 
 def get_names_under_mouse():
@@ -1191,6 +1554,20 @@ def get_names_under_mouse():
 
     names = ', '.join(names)  # join the names, separated by commas
     return names.capitalize()
+
+
+def get_tile_under_mouse():
+    global mouse_coord, current_map
+    # return a string with the names of all objects under the mouse
+    (x, y) = mouse_coord
+
+    # create a list with the names of all objects at the mouse's coordinates and in FOV
+    if x < MAP_WIDTH and x >= 0 and y < MAP_HEIGHT and y >= 0 and current_map[x][y].explored == True:
+        tile = current_map[x][y].label
+    else:
+        tile = 'unknown'
+
+    return tile.capitalize()
 
 
 def inventory_menu():
@@ -1290,328 +1667,71 @@ def next_floor():
 ############################################
 # map and world functions
 ############################################
-def make_world_map():
-    # fill map with unblocked tiles
-    world_map = [[Tile(False)
-                 for y in range(MAP_HEIGHT)]
-                 for x in range(MAP_WIDTH)]
-
-    # Create fog border around map
-    for i in range(MAP_WIDTH):
-        world_map[i][0].red_fog()
-        world_map[i][MAP_HEIGHT - 1].red_fog()
-    for j in range(MAP_HEIGHT):
-        world_map[0][j].red_fog()
-        world_map[MAP_WIDTH - 1][j].red_fog()
-
-    # Add other tiles
-    world_map[1][1].path()
-    world_map[1][2].path()
-    world_map[1][3].path()
-    world_map[1][4].plains()
-    world_map[1][5].plains()
-    world_map[1][6].forest()
-    world_map[1][7].forest()
-    world_map[1][8].forest()
-    world_map[1][9].forest()
-    world_map[1][10].forest()
-
-    world_map[2][1].mountain()
-    world_map[2][2].mountain()
-    world_map[2][3].mountain()
-    world_map[2][4].path()
-    world_map[2][5].plains()
-    world_map[2][6].forest()
-    world_map[2][7].forest()
-    world_map[2][8].forest()
-    world_map[2][9].forest()
-    world_map[2][10].forest()
-
-    world_map[3][1].mountain()
-    world_map[3][2].city()
-    world_map[3][3].mountain()
-    world_map[3][4].path()
-    world_map[3][5].mountain()
-    world_map[3][6].red_fog()
-
-    world_map[4][1].mountain()
-    world_map[4][2].path()
-    world_map[4][3].mountain()
-    world_map[4][4].path()
-    world_map[4][5].mountain()
-    world_map[4][6].red_fog()
-
-    world_map[5][1].path()
-    world_map[5][2].mountain()
-    world_map[5][3].mountain()
-    world_map[5][4].path()
-    world_map[5][5].mountain()
-    world_map[5][6].red_fog()
-
-    world_map[6][1].mountain()
-    world_map[6][2].path()
-    world_map[6][3].dungeon()
-    world_map[6][4].mountain()
-    world_map[6][5].mountain()
-    world_map[6][6].red_fog()
-
-    world_map[7][1].mountain()
-    world_map[7][2].mountain()
-    world_map[7][3].mountain()
-    world_map[7][4].mountain()
-    world_map[7][5].red_fog()
-    world_map[7][6].red_fog()
-
-    #change_map(world_map, "world")
-    load_map(map_num)
-
-
-def generate_city():
-    city_map = [[Tile(False)
-                for y in range(MAP_HEIGHT)]
-                for x in range(MAP_WIDTH)]
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            city_map[x][y].plains()
-
-    """
-    # logic for city map generation
-    1. divide map into sectors (residential, governmental, etc)
-    2. create roads between sectors
-    2. generate random buildings corresponding to sector type
-    3. delete buildings intersecting roads or other buildings
-    4. add additional structures/features in open spaces
-    5. add characters
-
-    # pseudocode
-    
-    # create randomized number of sectors
-    num_sectors = random.randint(4, 8)
-    sector_width = MAP_WIDTH - 1 / num_sectors / 2
-    sector_height = MAP_HEIGHT - 1 / num_sectors / 2
-
-    # create individual sector maps
-    # first create sectors dictionary, then create a sector map item for each sector
-    sectors = {}
-    for i in range(num_sectors):
-        sectors["sector_map{0}".format(i)] = random.choice(dicts.sector_list)
-
-    # next add each x and y coordinate within that sector to that sector's item
-    for x i range(num_sectors):
-        for y in range(sector_height + x * sector_height):
-            for x in range(sector_width + x * sector_width):
-                sectors["sector_map{1}".format(i)] += str(x, y)
-
-    # add roads between sectors
-    for j in range(num_sectors):
-        if(x,y) not in sectors[sector_map{1}.format(j)]:
-            city_map[x][y].path()
-
-    # add random buildings to each sector
-    for k in range(num_sectors):
-        if sectors[sector_map{0}.format(k)] = 'res':
-            # add res buildings
-        elif sectors[sector_map{0}.format(k)] = 'gov':
-            # add gov buildings
-        elif sectors[sector_map{0}.format(k)] = 'mil':
-            # add mil buildings
-    """
-    
-
-    # city_map[random.randint(0, MAP_WIDTH)][random.randint(0, MAP_HEIGHT)].entry()
-
-    return city_map
-
-
-def enter_location(x, y):
-    global entry_coords
-
-    entry_coords = (x, y)
-    if current_map[x][y].char is 'o':
-        message('You enter the city...', colors.gold)
-        change_map(generate_city(), "city")
-    elif current_map[x][y].char is '*':
-        message('You attempt to enter the dungeon, but a mysterious force blocks you...', colors.gold)
-        # change_map(generate_dungeon(), "dungeon")
-
-
-def exit_location(x, y):
-    if current_map[x][y].char is '<':
-        message('You leave the location and continue your quest.', colors.gold)
-        change_map(old_map, "world")
-
-
-def change_map(new_map, weather, label):
-    global current_map, old_map, fov_recompute, map_changed, weather_map, map_label
+def change_map(new_map, label, new_num):
+    global current_map, old_map, fov_recompute, map_changed, map_label, map_num
 
     if current_map:
         old_map = current_map
     current_map = new_map
-    weather_map = weather
     fov_recompute = True
     map_changed = True
     map_label = label
-
-    change_player_location(label)
+    map_num = new_num
     objects = []
     objects.append(player)
     # objects.append(current_map.objects)
 
 
-def change_player_location(map_label):
-    global map_changed
-
-    if map_changed:
-        if map_label == "city":
-            if last_button is '1':
-                current_map[MAP_WIDTH][0].entry()
-                player.x = MAP_WIDTH - 1
-                player.y = 0
-            elif last_button is '2' or last_button is 'DOWN':
-                current_map[MAP_WIDTH // 2][0].entry()
-                player.x = MAP_WIDTH // 2
-                player.y = 0
-            elif last_button is '3':
-                current_map[0][0].entry()
-                player.x = 0
-                player.y = 0
-            elif last_button is '4' or last_button is 'LEFT':
-                current_map[MAP_WIDTH - 1][MAP_HEIGHT // 2].entry()
-                player.x = MAP_WIDTH - 1
-                player.y = MAP_HEIGHT // 2
-            elif last_button is '6' or last_button is 'RIGHT':
-                current_map[0][MAP_HEIGHT // 2].entry()
-                player.x = 0
-                player.y = MAP_HEIGHT // 2
-            elif last_button is '7':
-                current_map[MAP_WIDTH - 1][MAP_HEIGHT - 1].entry()
-                player.x = MAP_WIDTH - 1
-                player.y = MAP_HEIGHT - 1
-            elif last_button is '8' or last_button is 'UP':
-                current_map[MAP_WIDTH // 2][MAP_HEIGHT - 1].entry()
-                player.x = MAP_WIDTH // 2
-                player.y = MAP_HEIGHT - 1
-            elif last_button is '9':
-                current_map[0][MAP_HEIGHT - 1].entry()
-                player.x = 0
-                player.y = MAP_HEIGHT - 1
-        else:
-            player.x, player.y = entry_coords
-
-
 def load_map(map_num):
-    map_name = "map" + str(map_num)
     try:
-        level = getattr(maps, map_name)
-    except AttributeError:
-        print(map_num, "load_map()")
+        change_map(*load_map_from_file(map_num))
+    except IOError:
+        print("Map number: " + str(map_num), "load_map()")
         quit_game()
-    change_map(*load_map_from_file(map_num))
-    #change_map(*read_level(level))
-
-
-def read_level(level_dict):
-    global tile_types, weather_types, level_map, weather_map, map_tiles, map_weather_types
-    level_map = [[Tile(False)
-                    for y in range(MAP_HEIGHT)]
-                    for x in range(MAP_WIDTH)]
-    weather_map = [[WeatherEffects()
-                    for y in range(MAP_HEIGHT)]
-                    for x in range(MAP_WIDTH)]
-
-    for item in level_dict:
-        if item in tile_types:
-            map_tiles.append(item)
-        elif item in weather_types:
-            map_weather_types.append(item)
-
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            getattr(level_map[x][y], level_dict['bg'])()
-
-    for tile_type in map_tiles:
-        if len(level_dict[tile_type]) > 0:
-            for coord_range in level_dict[tile_type]:
-                for y in range(coord_range[0][1], coord_range[1][1] + 1):
-                    for x in range(coord_range[0][0], coord_range[1][0] + 1):
-                        getattr(level_map[x][y], tile_type)()
-
-    for weather_type in map_weather_types:
-        if len(level_dict[weather_type]) > 0:
-            for coord_range in level_dict[weather_type]:
-                for y in range(coord_range[0][1], coord_range[1][1] + 1):
-                    for x in range(coord_range[0][0], coord_range[1][0] + 1):
-                        getattr(weather_map[x][y], weather_type)()
-
-    return(level_map, weather_map, level_dict['label'])
 
 
 def load_map_from_file(map_num):
-    global tile_types, weather_types, level_map, weather_map, map_tiles, map_weather_types
+    global level_map, map_tiles
 
     level_map = [[Tile(False)
                     for y in range(MAP_HEIGHT)]
                     for x in range(MAP_WIDTH)]
-    weather_map = [[WeatherEffects()
-                    for y in range(MAP_HEIGHT)]
-                    for x in range(MAP_WIDTH)]
 
-    count = 0
+    count = 1
+    map_label = None
+    map_tiles = None
     file_name = "map" + str(map_num) + ".txt"
     with open(file_name) as f:
         for line in f.readlines():
-            if count == 1:
+            if count == 2:
                 map_label = line
-            elif count == 4:
+            elif count == 5:
                 map_tiles = ast.literal_eval(line)
-            elif count >= 7:
+            elif count >= 8:
                 line = line.replace('\n', '')
                 content = line.split(':')
                 if count < 3807:
                     if int(content[0]) != -1:
                         getattr(level_map[int(content[1])][int(content[2])], map_tiles[int(content[0])])()
                 elif count >= 3810:
-                    getattr(level_map[int(content[0])][int(content[1])], "linked_map_num", content[2])
+                    setattr(level_map[int(content[0])][int(content[1])], "linked_map_num", content[2])
             count += 1
 
-    return(level_map, weather_map, map_label)
+    return(level_map, map_label, map_num)
+
+
+def change_level(x, y):
+    global current_map
+
+    load_map(current_map[x][y].linked_map_num)
 
 
 ############################################
-# misc. helper functions
+# rendering functions
 ############################################
-def random_choice(chances_dict):
-    # choose one option from dictionary of chances, returning its key
-    chances = chances_dict.values()
-    strings = chances_dict.keys()
-    return strings[random_choice_index(chances)]
-
-
-def random_choice_index(chances):
-    # choose one option from list of chances, returning its index
-    # the dice will land on some number between 1 and the sum of the chances
-    dice = random.randint(1, sum(chances))
-
-    # go through all chances, keeping the sum so far
-    running_sum = 0
-    choice = 0
-    for w in chances:
-        running_sum += w
-
-        # see if the dice landed in the part that corresponds to this choice
-        if dice <= running_sum:
-            return choice
-        choice += 1
-
-
 # TODO: implement weather effects 
 def render_all():
-    global fov_recompute
-    global visible_tiles
-    global player
-    global current_map
-    global map_changed
-    global weather_map
+    global fov_recompute, visible_tiles, current_map, map_changed
 
     if map_changed:
         map_changed = False
@@ -1628,27 +1748,15 @@ def render_all():
                 if not visible:
                     # if it's not visible right now, the player can only see it if it's explored
                     if current_map[x][y].explored:
-                        con.draw_char(x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=None)
-
-                        # render weather of tiles outside fov
-                        #weather_map[x][y].fog()
-                        #con.draw_char(x, y, weather_map[x][y].char, weather_map[x][y].fog_color, bg=None)
+                        con.draw_char(x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=current_map[x][y].dark_bg)
                     else:
                         con.draw_char(x, y, None, None, bg=None)
                 else:
-                    con.draw_char(x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=None)
-
-                    # render weather effects on visible tiles
-                    if not adjacent_to(x, y, player):
-                        if weather_map[x][y].label == "fog":
-                            #weather_map[x][y].light_fog()
-                            pass
-                        #con.draw_char(x, y, weather_map[x][y].char, weather_map[x][y].vis_color, bg=None)
-                    else:
-                        con.draw_char(x, y, None, None, bg=None)
+                    con.draw_char(x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=current_map[x][y].bg)
 
                     # since it's visible, explore it
                     current_map[x][y].explored = True
+
 
     # draw all objects in the list for current map
     for obj in objects:
@@ -1658,6 +1766,12 @@ def render_all():
     
     # blit the contents of "con" to the root console and present it
     root.blit(con, 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0)
+
+    render_gui()
+
+
+def render_gui():
+    global player
 
     # prepare to render the GUI panel
     panel.clear(fg=colors.white, bg=colors.black)
@@ -1671,10 +1785,14 @@ def render_all():
     # show the player's stats
     render_bar(1, 1, BAR_LENGTH, 'HP', player.fighter.curr_hp, player.fighter.hit_points,
                colors.light_red, colors.darker_red)
+    render_bar(1, 3, BAR_LENGTH, 'MP', player.fighter.curr_hp, player.fighter.hit_points,
+               colors.light_blue, colors.darker_blue)
 
     # display names of objects under the mouse
     if mouse_coord:
         panel.draw_str(1, 0, get_names_under_mouse(), bg=None, fg=colors.light_gray)
+        panel.draw_str(1, -1, get_tile_under_mouse(), bg=None, fg=colors.light_gray)
+
 
     # blit the contents of "panel" to the root console
     root.blit(panel, 0, PANEL_Y, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0)
@@ -1695,6 +1813,12 @@ def is_visible_tile(x, y):
         return True
 
 
+def explore_tiles(x, y):
+    visible_tiles = tdl.map.quickFOV(x, y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
+    for (x, y) in visible_tiles:
+        current_map[x][y].explored = True
+
+
 ############################################
 # real-time functions
 ############################################
@@ -1710,37 +1834,8 @@ def update_queue():
 ############################################
 # developer functions
 ############################################
-def edit_mode():
-    global current_map, objects, game_state, fov_recompute, map_tiles, fill_mode
-
-    click_coords = False
-    keypress = False
-    right_click_flag = False
-    for event in tdl.event.get():
-        if event.type == 'KEYDOWN':
-            user_input = event
-            keypress = True
-        if event.type == 'MOUSEDOWN':
-            if event.button == 'RIGHT':
-                right_click_flag = True
-            click_coords = event.cell
-    if keypress:
-        if user_input.text == 'E':
-            game_state = 'playing'
-            message("Leaving edit mode!", colors.light_azure)
-            return
-        elif user_input.text == 'S':
-            message("Saving map...", colors.azure)
-            save_map()
-        elif user_input.text == 'F':
-            if not fill_mode:
-                message('Click group of tiles to fill.', colors.light_red)
-                fill_mode = True
-            else:
-                message('Leaving fill mode.', colors.light_red)
-                fill_mode = False
-        elif user_input.text == 'Q':
-            sys.exit()
+def edit_mode(click_coords=None):
+    global current_map, objects, fov_recompute, map_tiles, fill_mode, map_num, right_click_flag
 
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
@@ -1796,17 +1891,19 @@ def save_map():
                 else:
                     linked_map_num = None
                     while linked_map_num is None:
+                        message("The tile at (" + str(x) + ", " + str(y) + ") (" + current_map[x][y].label +
+                        ") is not linked. Please enter the number of the map you wish to link it to and press enter.", colors.orange)
                         try:
                             input_str = link_tiles(x, y)
                             linked_map_num = int(input_str)
                         except(ValueError):
                             message("Input of " + input_str + " cannot be converted to a number. Please try again.", colors.red)
                     message("The number you selected was " + input_str + ".", colors.azure)
+                    current_map[x][y].linked_map_num = linked_map_num
                 map_file.write(str(x) + ':' + str(y) + ':' + str(linked_map_num))
                 map_file.write("\n")
 
     map_file.close()
-
     message("Map saved!", colors.azure)
 
 
@@ -1848,10 +1945,6 @@ def flood_fill(x, y, target_type, replacement_type):
 
 
 def link_tiles(x, y):
-    global current_map
-
-    message("The tile at (" + str(x) + ", " + str(y) + ") (" + current_map[x][y].label +
-                ") is not linked. Please enter the number of the map you wish to link it to and press enter.", colors.orange)
     num_str = ""
     user_input = tdl.event.key_wait()
     while user_input.key != 'ENTER':
@@ -1860,12 +1953,42 @@ def link_tiles(x, y):
     return num_str
 
 
+def new_map(map_num):
+    global map_tiles, map_label
+
+    choice = menu("Make a new map of number " + str(map_num) + "?", ["No", "Yes"], 24)
+
+    if choice:
+        file_name = "map" + str(map_num) + ".txt"
+        try:
+            map_file = open(file_name, 'r')
+        except IOError:
+            map_file = open(file_name, 'w')
+            map_file.write("[MAP LABEL]\n")
+            map_file.write(map_label + "\n")
+            map_file.write("[TILESET]\n")
+            map_file.write(str(map_tiles) + "\n\n")
+            map_file.write("[MAP DATA]\n")
+            map
+        else:
+            message("A map with the given number already exists.", colors.red)
+        map_file.close()
+        return True
+    return False
+
+
 ############################################
 # intro screen functions
 ############################################()
 def main_menu():
+    global game_state, game_msgs, objects, map_num, debug_flag, player_action
     # img = libtcod.image_load('menu_background2.png')
     game_state = 'menu'
+    game_msgs = []
+    objects = []
+    map_num = 0
+    debug_flag = False
+    player_action = None
 
     while not tdl.event.is_window_closed():
         # show the background image, at twice the regular console resolution
@@ -1877,33 +2000,43 @@ def main_menu():
         # new game
         if choice is 0:
             new_game()
+            save_game()
             play_game()
         elif choice is 1:
-            pass
+            if load_game_menu():
+                play_game()
         # quit
         elif choice is 2:
-            quit_game()
+            exit()
 
 
 def new_game():
-    global player
+    global player, debug_flag, game_state
+
+    if game_state != 'simulating':
+        choice = menu("Debug mode?", ['Yes', 'No'], 24)
+        if choice == 0:
+            debug_flag = True
+
+        # generate game seed based on current time
+        generate_seed()
 
     # first create the player out of its components
     player_comp = Player()
     fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 15)
-    player = Object(1, 1, '@', "Player", colors.gray, fighter=fighter_comp, player=player_comp)
+    player = Object(entry_coords[0], entry_coords[1], '@', "Player", colors.gray, fighter=fighter_comp, player=player_comp)
     objects.append(player)
+
+    # load map0.txt and draw to screen
+    load_map(0)
 
     #ai_comp = AI('ConstantAttack')
     #enemy_fighter_comp = Fighter(1, 1, 1, 1, 1, 1, 1, 1, 1, ai=ai_comp)
     #enemy = Object(0, 0, 'T', "Test Enemy", colors.dark_red, fighter=enemy_fighter_comp)
     #objects.append(enemy)
 
-    # generate world map (at this point it's not drawn to the screen)
-    make_world_map()
-
     # a warm welcoming message!
-    message('You awaken with a burning desire to act. You feel as if you should recognize this place.', colors.red)
+    message('You awaken with a burning desire to act. You feel as if you should recognize this place.', colors.light_flame)
 
     # initial equipment: a broken sword
     equipment_component = Equipment(slot='hand', durability=10, equippable_at = 'hand')
@@ -1912,13 +2045,15 @@ def new_game():
                    always_visible=True)
     player.fighter.inventory.append(sword)
     # player.fighter.equip(equipment_component)
-    play_game()
 
 
 def play_game():
     global game_state
-    # player_action = None
+
+    player_action = None
     game_state = 'playing'
+
+    message("The seed of this game is: " + str(seed) + ".")
 
     # main loop
     while not tdl.event.is_window_closed():
@@ -1927,12 +2062,10 @@ def play_game():
         tdl.flush()
 
         # handle keys and exit game if needed
-        if game_state == 'edit':
-            edit_mode()
-        else:
-            player_action = handle_keys()
+        player_action = handle_keys()
 
-        
+        if player_action is not None and player_action != 'didnt-take-turn':
+            save_action(player_action)
 
         if player_action == 'exit':
             break
@@ -1945,14 +2078,119 @@ def play_game():
                     pass
 
 
+# to reduce filesize, 2 methods:
+#   1. seed game and record player actions from beginning, as in debug mode
+#   2. record entire game map in more compressed format, by recording only (x, y) of each tile that has been explored
+#       and re-creating the maps by loading each tile from files and setting explored values iteratively
+def save_game():
+    if debug_flag:
+        file_name = player.name + "_debug_savegame"
+        savefile = shelve.open("./saves/" + file_name, 'n')
+        savefile['player_actions'] = []
+        # serialize and save initial game state...all based off seed
+        # serialize and save every player action
+        # only works if game is deterministic, e.g. all randomization determined by seed
+    else:
+        file_name = player.name + "_savegame"
+        savefile = shelve.open("./saves/" + file_name, 'n')
+        savefile['current_map'] = current_map
+    savefile['seed'] = seed
+    savefile['objects'] = objects
+    # don't save player object seperately because shelf module will create two player instances on load
+    savefile['player_index'] = objects.index(player)
+    savefile['game_msgs'] = game_msgs
+    savefile['game_state'] = game_state
+    savefile['map_num'] = map_num
+    savefile.close()
+        # also need to save all changes to map data (e.g. exploration of tiles)
+
+def save_action(action):
+    if debug_flag:
+        file_name = player.name + "_debug_savegame"
+        savefile = shelve.open("./saves/" + file_name, 'c')
+        temp_list = savefile['player_actions']
+        temp_list.append(str(serialize_action(action)))
+        savefile['player_actions'] = temp_list
+        savefile.close()
+
+
+def load_game_menu():
+    saved_games = []
+    choice = None
+    for file in os.listdir("./saves"):
+        if file.endswith("_savegame"):
+            saved_games.append(file[0:-9])
+    choice = menu("Choose a save game to load.", saved_games + ['Back'], SCREEN_WIDTH)
+    if choice == len(saved_games) or choice is None:
+        return 0
+    if "debug" in saved_games[choice]:
+        load_game(saved_games[choice] + "_savegame", True)
+    else:
+        load_game(saved_games[choice] + "_savegame")
+    return 1
+
+
+def load_game(file_name, debug=False):
+    #open the previously saved shelve and load the game data
+    global seed, objects, player, game_msgs, game_state, current_map, map_num
+
+    if debug:
+        savefile = shelve.open('./saves/' + file_name, 'r')
+        player_actions = savefile['player_actions']
+        seed = savefile['seed']
+        simulate_game(player_actions)
+    else:
+        savefile = shelve.open('./saves/' + file_name, 'r')
+        seed = savefile['seed']
+        objects = savefile['objects']
+        player = objects[savefile['player_index']]  # get index of player in objects list and access it
+        game_msgs = savefile['game_msgs']
+        game_state = savefile['game_state']
+        map_num = savefile['map_num']
+        current_map = savefile['current_map']
+
+    savefile.close()
+
+
 def quit_game():
     sys.exit()
+
+
+def generate_seed():
+    global seed
+
+    time = datetime.datetime.now()
+    seed = int(re.sub('[-: \.]', '', str(time)))
+
+
+def serialize_action(action):
+    if action in dicts.possible_player_actions:
+        return dicts.possible_player_actions.index(action)
+
+
+def deserialize_action(serial):
+    if serial < len(dicts.possible_player_actions):
+        return dicts.possible_player_actions[serial]
+
+
+def simulate_game(player_actions):
+    global seed, game_state, debug_flag
+
+    game_state = 'simulating'
+    new_game()
+    for item in player_actions:
+        # simulate the action
+        command = deserialize_action(int(item))
+        handle_keys(command)
+        explore_tiles(player.x, player.y)
+    debug_flag = True
 
 
 #############################################
 # Initialization & Main Loop                #
 #############################################
-tdl.set_font('terminal12x12_gs_ro.png', greyscale=True, altLayout=False)
+#tdl.set_font('terminal12x12_gs_ro.png', greyscale=True, altLayout=False)
+tdl.set_font('unifont_9x15.png')
 tdl.setFPS(LIMIT_FPS)
 root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="RogueSouls", fullscreen=False)
 con = tdl.Console(MAP_WIDTH, MAP_HEIGHT)
@@ -1969,21 +2207,25 @@ entry_coords = (12, 24)
 fov_recompute = True
 player_action = None
 mouse_coord = (0, 0)
+game_state = ''
 
 map_num = 0
+map_changed = False
 current_map = []
-weather_map = []
 level_map = []
 map_tiles = []
-map_weather_types = []
 map_label = ""
+map_enemies_types = []
+map_items_types = []
+
 fill_mode = False
 recurse_count = 0
 max_recurse_flag = False
 
+seed = 0
+debug_flag = False
 
-tile_types = ["bird_nest", "cave_floor", "city", "desert", "dirt", "dungeon", "entry", "forest", "ladder",
-                "mountain", "path", "plains", "red_fog", "stone_wall", "swamp", "water"]
-weather_types = ["darkness", "fire", "fog", "light_fog", "rain", "heavy_rain"]
+door_tiles = ['door_hor', 'door_vert']
+special_tiles = ['fog_wall']
 
 main_menu()

@@ -112,21 +112,4 @@ AI = {
 }
 
 
-location_info = {
-    'city': {
-        'human',
-        'giant',
-        ''
-    },
-    'dungeon': {
-
-    },
-
-    'castle': {
-
-    }
-}
-
-sector_list = ['res', 'gov', 'mil']
-
-
+possible_player_actions = ["MV N", "MV NE", "MV E", "MV SE", "MV S", "MV SW", "MV W", "MV NW", "WAIT", "PICK UP", ""]

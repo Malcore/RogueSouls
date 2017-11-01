@@ -218,3 +218,31 @@ silver=(203,203,203)
 # miscellaneous
 celadon=(172,255,175)
 peach=(255,159,127)
+
+# pallete 1: old-copper-based darker pastel tetrad
+# colors ordered in 4 groups by base, with 2 shades lighter and 2 shades darker, from lightest to darkest
+domino=(151,123,95)
+tobacco_brown=(113,89,65)
+old_copper=(107,74,43) # base1, "brown"
+punga=(92,58,25)
+bronze=(69,38,8)
+
+limed_spruce=(60,87,93)
+pickled_bluewood=(41,65,70)
+blue_diane=(27,59,66) # base2, "dark teal"
+firefly=(17,49,57)
+tiber=(6,36,43)
+
+mulled_wine=(73,72,105)
+martinique=(52,50,79)
+port_gore=(38,36,74) # base3, "dark blue"
+dark_port_gore=(26,24,64)
+haiti=(13,12,48)
+
+clay_creek=(151,138,95)
+light_tobacco_brown=(113,102,65)
+shingle_fawn=(107,92,43) # base4, "dark gold"
+west_coast=(92,68,25)
+bronze_olive=(69,55,8)
+
+golden_tips=(222,186,19)
