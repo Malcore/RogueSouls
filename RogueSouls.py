@@ -64,7 +64,7 @@ TURN_SPEED = 10
 # number of frames that a character is invulnerable while dodging
 DODGE_TIME = 8
 
-MAX_ACTION_BUFFER = 10
+NUMBER_MAPS = 4
 ########################################################################################################################
 # Major TODOs                                                                                                          #
 ########################################################################################################################
@@ -111,23 +111,30 @@ class Object:
             self.player.owner = self
 
     def move(self, dx, dy):
-        global fov_recompute, current_map
+        global fov_recompute, current_map, death_coords, death_map_num
+
+        if self.player is not None:
+            death_coords = (player.x, player.y)
+            death_map_num = map_num
+
         # move by the given amount
         if self.x + dx > MAP_WIDTH - 1 or self.x + dx < 0:
             return
         elif self.y + dy > MAP_HEIGHT - 1 or self.y + dy < 0:
             return
-        if current_map[self.x + dx][self.y + dy].interact(self):
-            fov_recompute = True
-            return
+        #    fov_recompute = True
+        #    return
         if not is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
             if current_map[self.x][self.y].linking:
                 change_level(self.x, self.y)
-            elif current_map[self.x][self.y].label == "abyss":
-                player.fighter.death()
-        if self.player:
+            if self.player:
+                fov_recompute = True
+                render_all()
+            current_map[self.x][self.y].interact(self)
+            fov_recompute = True
+        elif current_map[self.x + dx][self.y + dy].interact(self):
             fov_recompute = True
 
     def move_towards(self, target_x, target_y):
@@ -212,7 +219,7 @@ class Tile:
         self.fog_color = fog_color
         # declares if tile links to different map
         self.linking = linking
-        # delcares which map tile is linked to
+        # declares which map tile is linked to
         self.linked_map_num = linked_map_num
         self.label = label
         self.bg = bg
@@ -221,21 +228,25 @@ class Tile:
         self.fighter_interaction = fighter_interaction
         self.obj_interaction = obj_interaction
         self.open = False
+        self.old_tile = ''
 
     def interact(self, obj):
+        # if the interaction effects all objects
+        if obj is not None:
+            if self.obj_interaction is not None:
+                return getattr(self, self.obj_interaction)(obj)
+        # else if the interaction effects all fighter objects
+        if obj.fighter is not None:
+            if self.fighter_interaction is not None:
+                return getattr(self, self.fighter_interaction)(obj)
+        # else if the interaction effects only the player
         if obj.player is not None:
             if self.player_interaction is not None:
-                return getattr(self, self.player_interaction)()
-        elif obj.fighter is not None:
-            if self.fighter_interaction is not None:
-                return getattr(self, self.fighter_interaction)()
-        elif obj is not None:
-            if self.obj_interaction is not None:
-                return getattr(self, self.obj_interaction)()
+                return getattr(self, self.player_interaction)(obj)
         else:
             return False
 
-    def open_tile(self):
+    def open_tile(self, obj):
         # used to toggle open/closed state of doors, chests, etc.
         if not self.open:
             self.open = True
@@ -244,6 +255,33 @@ class Tile:
             return True
         else:
             return False
+
+    def rest(self, obj):
+        global respawn_point, respawn_map_num
+
+        message("You rest your weary soul...", colors.sea)
+        respawn_map_num = map_num
+        respawn_point = (obj.x, obj.y)
+        load_map(map_num)
+        return True
+    
+    def fall_full(self, obj):
+        if obj.player is not None:
+            message("You fall into the endless abyss.", colors.dark_amber)
+        if obj.fighter is not None:
+            obj.fighter.death()
+        elif obj is not None:
+            objects.remove(obj)
+        return True
+
+    def retrieve_souls(self, obj):
+        global dropped_souls
+
+        message("You gather your souls.")
+        getattr(self, self.old_tile)()
+        player.player.souls = dropped_souls
+        dropped_souls = 0
+        return True
 
         # Tile types, calling a function will set the tile to that type
         # Current total: 19
@@ -264,6 +302,7 @@ class Tile:
         self.fog_color = colors.black
         self.linking = False
         self.label = "abyss"
+        self.obj_interaction = 'fall_full'
 
     def bird_nest(self):
         self.blocked = False
@@ -273,6 +312,16 @@ class Tile:
         self.fog_color = colors.darker_sepia
         self.linking = False
         self.label = "bird_nest"
+
+    def bonfire(self):
+        self.blocked = True
+        self.block_sight = False
+        self.char = '\u234e'
+        self.vis_color = colors.yellow
+        self.fog_color = colors.dark_yellow
+        self.linking = False
+        self.label = "bonfire"
+        self.player_interaction = 'rest'
 
     def cave_floor(self):
         self.blocked = False
@@ -402,6 +451,24 @@ class Tile:
         self.linking = True
         self.label = "ladder"
 
+    def ledge_small(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u25bd'
+        self.vis_color = colors.white
+        self.fog_color = colors.light_gray
+        self.linking = True
+        self.label = "ledge_small"
+
+    def ledge_big(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = '\u25bc'
+        self.vis_color = colors.black
+        self.fog_color = colors.black
+        self.linking = True
+        self.label = "ledge_big"
+
     def marble_floor(self):
         self.blocked = False
         self.block_sight = False
@@ -468,6 +535,17 @@ class Tile:
         self.fog_color = colors.darker_crimson
         self.linking = False
         self.label = "red_fog"
+
+    def soul_pool(self):
+        self.blocked = False
+        self.block_sight = False
+        self.char = 'O'
+        self.vis_color = colors.white
+        self.fog_color = colors.light_gray
+        self.linking = False
+        self.old_tile = self.label
+        self.label = "soul_pool"
+        self.player_interaction = 'retrieve_souls'
 
     def stairs_up(self):
         self.blocked = False
@@ -553,6 +631,7 @@ class Tile:
         self.fog_color = colors.dark_blue
         self.linking = False
         self.label = "waterfall"
+        self.obj_interaction = 'fall_full'
 
     def wooden_bridge(self):
         self.blocked = False
@@ -635,17 +714,8 @@ class WeatherEffects:
         self.fog_color = colors.dark_blue
         self.label = "heavy_rain"
 
-
     def change_weather(self, new_weather):
         getattr(self, new_weather)()
-
-        '''
-        self.block_sight = new_weather.block_sight
-        self.char = new_weather.char
-        self.vis_color = new_weather.vis_color
-        self.fog_color = new_weather.fog_color
-        self.label = new_weather.label
-        '''
 
     def remove_weather(self):
         self.block_sight = False
@@ -656,23 +726,47 @@ class WeatherEffects:
 
 
 class Player:
-    def __init__(self, hunger=0, covenant=None, souls=0, skillpoints=0):
+    def __init__(self, hunger=0, covenant=None, undead=False, souls=100, skillpoints=0):
         self.hunger = hunger
         self.covenant = covenant
+        self.undead = undead
         self.souls = souls
         self.skillpoints = skillpoints
+        self.hp_mult = 1.0
+        self.stam_mult = 1.0
+
+        if self.undead:
+            self.hp_mult = 0.5
+            self.stam_mult = 0.5
 
     def level_up(self):
         self.owner.fighter.level += 1
         self.skillpoints += 1
         # TODO: implement level-up system
 
+    def respawn(self):
+        global respawn_point, dropped_souls
+
+        # make souls re-obtainable at death position
+        load_map(respawn_map_num)
+        for y in range(MAP_HEIGHT):
+            for x in range(MAP_WIDTH):
+                if current_map[x][y].label == 'soul_pool':
+                    getattr(current_map[x][y], current_map[x][y].old_tile)()
+        current_map[death_coords[0]][death_coords[1]].soul_pool()
+        (self.owner.x, self.owner.y) = respawn_point
+        self.owner.fighter.curr_hp = self.owner.fighter.hit_points
+        dropped_souls = self.souls
+        self.souls = 0
+        message("You awaken in a familiar place.", colors.light_amber)
+
+
 
 class Fighter:
     # defines something that can take combat actions (e.g. any living character) and gives them combat statistics as
     # well as defining actions they can take during combat
     def __init__(self, vig=0, att=0, end=0, strn=0, dex=0, intl=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
-                 att_slots=0, right1=None, right2=None, left1=None, left2=None, head=None, chest=None, legs=None,
+                 att_slots=0, rhand1=None, rhand2=None, lhand1=None, lhand2=None, head=None, chest=None, legs=None,
                  arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
                  def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0, res_frost=0, res_curse=0,
                  bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1, soul_value=0, wait_time=0,
@@ -690,17 +784,17 @@ class Fighter:
         self.poise = poise
         self.item_dis = item_dis
         self.att_slots = att_slots
-        self.right1 = right1
-        self.right2 = right2
-        self.left1 = left1
-        self.left2 = left2
         self.head = head
         self.chest = chest
-        self.legs = legs
         self.arms = arms
+        self.legs = legs
+        self.neck = neck
         self.ring1 = ring1
         self.ring2 = ring2
-        self.neck = neck
+        self.rhand1 = rhand1
+        self.rhand2 = rhand2
+        self.lhand1 = lhand1
+        self.lhand2 = lhand2
         self.def_phys = def_phys
         self.def_slash = def_slash
         self.def_blunt = def_blunt
@@ -790,9 +884,9 @@ class Fighter:
         # Other statistics
         self.curr_hp = self.hit_points
         self.curr_ap = self.att_points
-        self.curr_sp = self.stamina
-        self.curr_r = right1
-        self.curr_l = left2
+        self.curr_stam = self.stamina
+        self.curr_r = rhand1
+        self.curr_l = lhand1
 
     def handle_attack_move(self, side, type):
         keypress = False
@@ -829,9 +923,9 @@ class Fighter:
 
     def attack_handler(self, side, dir, type):
         if side == "right":
-            wep = get_equipped_in_slot(self, "right1")
+            wep = get_equipped_in_slot(self, 'rhand1')
         else:
-            wep = get_equipped_in_slot(self, "left1")
+            wep = get_equipped_in_slot(self, 'lhand1')
         if wep is None:
             wep_name = "Unarmed"
         else:
@@ -935,12 +1029,12 @@ class Fighter:
             item.equipped_at = 'neck'
             success = True
         elif choice is 5 and item.equippable_at is 'hand':
-            self.right1 = item
-            item.equipped_at = 'right1'
+            self.rhand1 = item
+            item.equipped_at = 'rhand1'
             success = True
         elif choice is 6 and item.equippable_at is 'hand':
-            self.left1 = item
-            item.equipped_at = 'left1'
+            self.lhand1 = item
+            item.equipped_at = 'lhand1'
             success = True
         elif choice is 7 and item.equippable_at is 'ring':
             self.ring1 = item
@@ -951,25 +1045,35 @@ class Fighter:
             item.equipped_at = 'ring2'
             success = True
         elif choice is 9 and item.equippable_at is 'hand':
-            self.right2 = item
-            item.equipped_at = 'right2'
+            self.rhand2 = item
+            item.equipped_at = 'rhand2'
             success = True
         elif choice is 10 and item.equippable_at is 'hand':
-            self.left2 = item
-            item.equipped_at = 'left2'
+            self.lhand2 = item
+            item.equipped_at = 'lhand2'
             success = True
         if success:
             item.is_equipped = True
             message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
 
+    def equip_to_slot(self, equipment, slot):
+        if equipment.equippable_at in slot:
+            setattr(self, slot, equipment)
+            equipment.equipped_at = slot
+            equipment.is_equipped = True
+            message("Equipped " + equipment.owner.owner.name + " to " + slot + ".", colors.light_green)
+        else:
+            message(equipment.owner.owner.name.capitalize() + " cannot be equipped to your " + slot + ".", colors.dark_green)
+
+
     # unequip object and show a message about it
-    def unequip(self, item):
-        if not item.is_equipped:
+    def unequip(self, equipment):
+        if not equipment.is_equipped:
             return
-        message('Unequipped ' + item.owner.owner.name + ' from ' + item.slot + '.', colors.light_green)
-        setattr(self, str(item.equipped_at), None)
-        item.is_equipped = False
-        item.equipped_at = None
+        message("Unequipped " + equipment.owner.owner.name + " from " + equipment.slot + ".", colors.light_green)
+        setattr(self, str(equipment.equipped_at), None)
+        equipment.is_equipped = False
+        equipment.equipped_at = None
 
 
 class AI:
@@ -1067,11 +1171,46 @@ def add_curse(target, curr_wep):
 ############################################
 # death functions
 ############################################
+def player_death():
+    global player, game_state, death_coords, death_map_num
+
+    # TODO: use last button to find last location of player, set as death location
+    if player.fighter.curr_hp > 0:
+        player.fighter.curr_hp = 0
+    if not player.player.undead:
+        player.player.undead = True
+    message("You have died.", colors.dark_crimson)
+    player.fighter.wil -= 1
+    if player.fighter.wil == 0:
+        message("You no longer have the willpower to continue. Your heart and soul perish, and your body roams mindlessly as a cursed undead.", colors.darker_amber)
+        menu("Press any button to return to main menu...", [], 24)
+        game_state = 'game_over'
+        return
+    else:
+        while True:
+            choice = menu("Would you like to continue?", ['I must continue...', 'I cannot go on...'], 24)
+            while True:
+                if choice is 0:
+                    player.player.respawn()
+                    return
+                if choice is 1:
+                    double_check = menu("Are you certain?", ["Yes", "No"], 24)
+                    if double_check == 0:
+                        game_state = 'game_over'
+                        return
+                    else:
+                        break
+                else:
+                    break
+
+
 def basic_death(fighter):
     for obj in objects:
         if obj is fighter.owner:
             objects.remove(obj)
             del obj
+
+    player.player.souls += self.soul_value
 
 
 ############################################
@@ -1262,6 +1401,7 @@ def occupied(x, y):
             return obj
     return None
 
+
 def adjacent_to(x, y, obj):
     if obj.distance(x, y) <= 2:
         return True
@@ -1276,7 +1416,7 @@ def pick_up():
 
 
 ############################################
-# charater interaction functions
+# character interaction functions
 ############################################
 def close_doors(x, y):
     global current_map
@@ -1305,10 +1445,13 @@ def close_doors(x, y):
     elif current_map[x-1][y].label in door_tiles:
         dx = -1
         dy = 0
+    else:
+        return
     if current_map[x + dx][y + dy].open:
         current_map[x + dx][y + dy].open = False
         getattr(current_map[x + dx][y + dy], current_map[x + dx][y + dy].label)()
         message("You close the door...", colors.darker_green)
+
 
 ############################################
 # player interaction functions
@@ -1350,7 +1493,6 @@ def handle_keys(command=None):
             if choice is 0:
                 double_check = menu('Are you sure?', ['No', 'Yes'], 24)
                 if double_check:
-                    save_game()
                     main_menu()
                 else:
                     return
@@ -1364,6 +1506,10 @@ def handle_keys(command=None):
                 return
 
         if game_state == 'playing' or game_state == 'simulating':
+            if user_input.text:
+                last_button = user_input.text
+            else:
+                last_button = user_input.key
             # movement keys
             if user_input.key == 'UP' or user_input.text == '8':
                 player.move(0, -1)
@@ -1418,7 +1564,7 @@ def handle_keys(command=None):
                         player.fighter.equip(item.item.equipment)
 
                 elif user_input.text == 'e':
-                    equip_or_unequip(equipment_menu())
+                    equip_or_unequip(player.fighter, equipment_menu())
 
                 # force quit key?
                 elif user_input.text == 'Q':
@@ -1453,8 +1599,6 @@ def handle_keys(command=None):
                     game_state = 'editing'
                     edit_mode()
                 elif user_input.text == 'S':
-                    if not debug_flag:
-                        save_game()
                     message("Game saved!", colors.green)
                 elif user_input.text == 'c':
                     close_doors(player.x, player.y)
@@ -1581,22 +1725,19 @@ def inventory_menu():
 
 
 # Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
-def equip_or_unequip(index):
-    item_choice = inventory_menu()
-    if item_choice is not None:
-        item = player.fighter.inventory[item_choice]
-    #player.fighter.equip(item)
-    '''
-    if index is not None and index < len(player.fighter.inventory):
-        item_obj = player.fighter.inventory[index]
-        if item_obj.item.equipment:
-            for obj in player.fighter.inventory:
-                if obj == item_obj:
-                    if item_obj in get_all_equipped(player):
-                        player.fighter.unequip(item_obj.item.equipment)
-                    else:
-                        player.fighter.equip(item_obj.item.equipment)
-    '''
+def equip_or_unequip(fighter, index):
+    if index is None or index > 10:
+        return
+    if get_equipped_in_slot(fighter, equipment_slots[index]):
+        for item in fighter.inventory:
+            if item.item.equipment.equipped_at == equipment_slots[index]:
+                equipment = item.item.equipment
+        fighter.unequip(equipment)
+    else:
+        item_choice = inventory_menu()
+        if item_choice is not None:
+            equipment = fighter.inventory[item_choice].item.equipment
+            fighter.equip_to_slot(equipment, equipment_slots[index])
 
 
 def equipment_menu():
@@ -1630,20 +1771,20 @@ def equipment_menu():
         options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name))
     else:
         options.append("Left Ring: None")
-    if player.fighter.right1:
-        options.append("Right Hand: " + str(player.fighter.right1.owner.owner.name))
+    if player.fighter.rhand1:
+        options.append("Right Hand: " + str(player.fighter.rhand1.owner.owner.name))
     else:
         options.append("Right Hand: None")
-    if player.fighter.left1:
-        options.append("Left Hand: " + str(player.fighter.left1.owner.owner.name))
+    if player.fighter.lhand1:
+        options.append("Left Hand: " + str(player.fighter.lhand1.owner.owner.name))
     else:
         options.append("Left Hand: None")
-    if player.fighter.right2:
-        options.append("Right Quickslot: " + str(player.fighter.right2.owner.owner.name))
+    if player.fighter.rhand2:
+        options.append("Right Quickslot: " + str(player.fighter.rhand2.owner.owner.name))
     else:
         options.append("Right Quickslot: None")
-    if player.fighter.left2:
-        options.append("Left Quickslot: " + str(player.fighter.left2.owner.owner.name))
+    if player.fighter.lhand2:
+        options.append("Left Quickslot: " + str(player.fighter.lhand2.owner.owner.name))
     else:
         options.append("Left Quickslot: None")
     options.append("Close menu")
@@ -1686,7 +1827,7 @@ def load_map(map_num):
     try:
         change_map(*load_map_from_file(map_num))
     except IOError:
-        print("Map number: " + str(map_num), "load_map()")
+        print("Map " + str(map_num), " not found. Exception in load_map().")
         quit_game()
 
 
@@ -1784,9 +1925,11 @@ def render_gui():
 
     # show the player's stats
     render_bar(1, 1, BAR_LENGTH, 'HP', player.fighter.curr_hp, player.fighter.hit_points,
-               colors.light_red, colors.darker_red)
-    render_bar(1, 3, BAR_LENGTH, 'MP', player.fighter.curr_hp, player.fighter.hit_points,
-               colors.light_blue, colors.darker_blue)
+               colors.dark_red, colors.darker_red)
+    render_bar(1, 3, BAR_LENGTH, 'Stamina', player.fighter.curr_stam, player.fighter.stamina,
+               colors.dark_green, colors.darker_green)
+    panel.draw_str(1, 5, "Souls: " + str(player.player.souls), bg=None, fg=colors.white)
+    panel.draw_str(1, 7, "Willpower: " + str(player.fighter.wil), bg=None, fg=colors.white)
 
     # display names of objects under the mouse
     if mouse_coord:
@@ -1981,49 +2124,52 @@ def new_map(map_num):
 # intro screen functions
 ############################################()
 def main_menu():
-    global game_state, game_msgs, objects, map_num, debug_flag, player_action
+    global game_state, game_msgs, objects, map_num, player_action
     # img = libtcod.image_load('menu_background2.png')
     game_state = 'menu'
     game_msgs = []
     objects = []
     map_num = 0
-    debug_flag = False
     player_action = None
 
     while not tdl.event.is_window_closed():
         # show the background image, at twice the regular console resolution
         # libtcod.image_blit_2x(img, 0, 8, 3)
 
+        root.draw_str(SCREEN_WIDTH // 2 - 7, SCREEN_HEIGHT // 2 - 12, 'RogueSouls', fg=colors.crimson, bg=colors.darkest_han)
+        root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT // 2 - 10, 'By Jerezereh')
+
         # show options and wait for the player's choice
         choice = menu('', ['Play a new game', 'Continue last game', 'Quit'], 24)
 
         # new game
         if choice is 0:
+            initialize_variables()
             new_game()
             save_game()
             play_game()
+        # continue saved game
         elif choice is 1:
             if load_game_menu():
+                initialize_variables()
                 play_game()
+            else:
+                root.clear()
         # quit
         elif choice is 2:
             exit()
 
 
 def new_game():
-    global player, debug_flag, game_state
+    global player, game_state
 
     if game_state != 'simulating':
-        choice = menu("Debug mode?", ['Yes', 'No'], 24)
-        if choice == 0:
-            debug_flag = True
-
         # generate game seed based on current time
         generate_seed()
 
     # first create the player out of its components
     player_comp = Player()
-    fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 15)
+    fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 3, death_func=player_death)
     player = Object(entry_coords[0], entry_coords[1], '@', "Player", colors.gray, fighter=fighter_comp, player=player_comp)
     objects.append(player)
 
@@ -2037,6 +2183,7 @@ def new_game():
 
     # a warm welcoming message!
     message('You awaken with a burning desire to act. You feel as if you should recognize this place.', colors.light_flame)
+    message("The seed of this game is: " + str(seed) + ".")
 
     # initial equipment: a broken sword
     equipment_component = Equipment(slot='hand', durability=10, equippable_at = 'hand')
@@ -2044,7 +2191,6 @@ def new_game():
     sword = Object(0, 0, '-', name="Broken Sword", color=colors.sky, block_sight=False, item=item_comp,
                    always_visible=True)
     player.fighter.inventory.append(sword)
-    # player.fighter.equip(equipment_component)
 
 
 def play_game():
@@ -2052,8 +2198,6 @@ def play_game():
 
     player_action = None
     game_state = 'playing'
-
-    message("The seed of this game is: " + str(seed) + ".")
 
     # main loop
     while not tdl.event.is_window_closed():
@@ -2073,83 +2217,65 @@ def play_game():
         # let monsters take their turn
         if game_state == 'playing' and player_action != 'didnt-take-turn':
             for obj in objects:
-                if obj.fighter.ai:
-                    # obj.fighter.ai.take_turn()
-                    pass
+                if obj.fighter is not None:
+                    if obj.fighter.ai is not None:
+                        # obj.fighter.ai.take_turn()
+                        pass
+
+        if game_state == 'game_over':
+            return
 
 
-# to reduce filesize, 2 methods:
-#   1. seed game and record player actions from beginning, as in debug mode
-#   2. record entire game map in more compressed format, by recording only (x, y) of each tile that has been explored
-#       and re-creating the maps by loading each tile from files and setting explored values iteratively
 def save_game():
-    if debug_flag:
-        file_name = player.name + "_debug_savegame"
-        savefile = shelve.open("./saves/" + file_name, 'n')
-        savefile['player_actions'] = []
-        # serialize and save initial game state...all based off seed
-        # serialize and save every player action
-        # only works if game is deterministic, e.g. all randomization determined by seed
-    else:
-        file_name = player.name + "_savegame"
-        savefile = shelve.open("./saves/" + file_name, 'n')
-        savefile['current_map'] = current_map
+    file_name = player.name + "_savegame"
+    savefile = shelve.open("./saves/" + file_name, 'n')
+    for i in range(NUMBER_MAPS):
+        savefile['player_actions_' + str(i)] = []
+    # serialize and save initial game state...all based off seed
+    # serialize and save every player action
+    # only works if game is deterministic, e.g. all randomization determined by seed
     savefile['seed'] = seed
-    savefile['objects'] = objects
-    # don't save player object seperately because shelf module will create two player instances on load
-    savefile['player_index'] = objects.index(player)
-    savefile['game_msgs'] = game_msgs
-    savefile['game_state'] = game_state
+
+    # don't save player object separately because shelf module will create two player instances on load
     savefile['map_num'] = map_num
     savefile.close()
-        # also need to save all changes to map data (e.g. exploration of tiles)
+    # also need to save all changes to map data (e.g. exploration of tiles)
+
 
 def save_action(action):
-    if debug_flag:
-        file_name = player.name + "_debug_savegame"
-        savefile = shelve.open("./saves/" + file_name, 'c')
-        temp_list = savefile['player_actions']
-        temp_list.append(str(serialize_action(action)))
-        savefile['player_actions'] = temp_list
-        savefile.close()
+    file_name = player.name + "_savegame"
+    savefile = shelve.open("./saves/" + file_name, 'c')
+    temp_list = savefile['player_actions_' + str(map_num)]
+    temp_list.append(str(serialize_action(action)))
+    savefile['player_actions_' + str(map_num)] = temp_list
+    savefile.close()
 
 
 def load_game_menu():
     saved_games = []
     choice = None
     for file in os.listdir("./saves"):
-        if file.endswith("_savegame"):
-            saved_games.append(file[0:-9])
+        if file.endswith("_savegame.dat"):
+            saved_games.append(file[0:-13])
     choice = menu("Choose a save game to load.", saved_games + ['Back'], SCREEN_WIDTH)
     if choice == len(saved_games) or choice is None:
         return 0
-    if "debug" in saved_games[choice]:
-        load_game(saved_games[choice] + "_savegame", True)
     else:
-        load_game(saved_games[choice] + "_savegame")
+        simulate_game(load_game(saved_games[choice] + "_savegame"))
     return 1
 
 
-def load_game(file_name, debug=False):
+def load_game(file_name):
     #open the previously saved shelve and load the game data
-    global seed, objects, player, game_msgs, game_state, current_map, map_num
+    global seed, objects, map_num, filename
 
-    if debug:
-        savefile = shelve.open('./saves/' + file_name, 'r')
-        player_actions = savefile['player_actions']
-        seed = savefile['seed']
-        simulate_game(player_actions)
-    else:
-        savefile = shelve.open('./saves/' + file_name, 'r')
-        seed = savefile['seed']
-        objects = savefile['objects']
-        player = objects[savefile['player_index']]  # get index of player in objects list and access it
-        game_msgs = savefile['game_msgs']
-        game_state = savefile['game_state']
-        map_num = savefile['map_num']
-        current_map = savefile['current_map']
-
+    filename = file_name
+    savefile = shelve.open('./saves/' + file_name, 'r')
+    map_num = savefile['map_num']
+    curr_player_actions = savefile['player_actions_' + str(map_num)]
+    seed = savefile['seed']
     savefile.close()
+    return curr_player_actions
 
 
 def quit_game():
@@ -2173,17 +2299,58 @@ def deserialize_action(serial):
         return dicts.possible_player_actions[serial]
 
 
-def simulate_game(player_actions):
-    global seed, game_state, debug_flag
+def simulate_game(player_actions, state='simulating'):
+    global game_state
 
-    game_state = 'simulating'
+    game_state = state
     new_game()
+    simulate_actions(player_actions)
+
+
+def simulate_actions(player_actions):
     for item in player_actions:
         # simulate the action
         command = deserialize_action(int(item))
         handle_keys(command)
         explore_tiles(player.x, player.y)
-    debug_flag = True
+
+
+def initialize_variables():
+    global objects, game_msgs, last_button, entry_coords, respawn_point, respawn_map_num, dropped_souls
+    global death_coords, death_map_num, fov_recompute, player_action, mouse_coord, game_state
+    global map_num, map_changed, current_map, level_map, map_tiles, map_label, map_enemies_types
+    global map_items_types, fill_mode, recurse_count, max_recurse_flag, seed, filename
+
+    objects = []  # everything in the game that isn't a tile
+    game_msgs = []  # buffer of the messages that appear on the screen
+    last_button = ''
+    entry_coords = (12, 24)
+    respawn_point = entry_coords
+    respawn_map_num = 0
+    dropped_souls = 0
+    death_coords = None
+    death_map_num = None
+
+    fov_recompute = True
+    player_action = None
+    mouse_coord = (0, 0)
+    game_state = ''
+
+    map_num = 0
+    map_changed = False
+    current_map = []
+    level_map = []
+    map_tiles = []
+    map_label = ""
+    map_enemies_types = []
+    map_items_types = []
+
+    fill_mode = False
+    recurse_count = 0
+    max_recurse_flag = False
+
+    seed = 0
+    filename = ''
 
 
 #############################################
@@ -2196,13 +2363,15 @@ root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="RogueSouls", fullscreen=Fals
 con = tdl.Console(MAP_WIDTH, MAP_HEIGHT)
 panel = tdl.Console(SCREEN_WIDTH, PANEL_HEIGHT)
 
-root.draw_str(SCREEN_WIDTH // 2 - 7, SCREEN_HEIGHT // 2 - 12, 'RogueSouls', fg=colors.crimson, bg=colors.darkest_han)
-root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT // 2 - 10, 'By Jerezereh')
-
 objects = []  # everything in the game that isn't a tile
 game_msgs = []  # buffer of the messages that appear on the screen
 last_button = ''
 entry_coords = (12, 24)
+respawn_point = entry_coords
+respawn_map_num = 0
+dropped_souls = 0
+death_coords = None
+death_map_num = None
 
 fov_recompute = True
 player_action = None
@@ -2223,9 +2392,10 @@ recurse_count = 0
 max_recurse_flag = False
 
 seed = 0
-debug_flag = False
+filename = ''
 
 door_tiles = ['door_hor', 'door_vert']
 special_tiles = ['fog_wall']
+equipment_slots = ['head', 'chest', 'arms', 'legs', 'neck', 'rring', 'lring', 'rhand1', 'rhand2', 'lhand1', 'lhand2']
 
 main_menu()
