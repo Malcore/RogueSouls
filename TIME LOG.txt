@@ -1,0 +1,3 @@
+TIME LOG
+* ~60 hours previous to document
+11/9/17: debugging of loading fighters on map (1 hour)
