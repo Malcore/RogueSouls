@@ -1,3 +1,8 @@
 TIME LOG
+
 * ~60 hours previous to document
-11/9/17: debugging of loading fighters on map (1 hour)
+11/09/17: 	debugging of loading fighters on map (1 hour)
+11/09/17: 	addition of item saving/loading on map (15 mins)
+11/12/17:	beginning of implementation of interaction system for objects (15 mins)
+12/07/17:	application of interaction system to items, creation of item classifications (1 hour)
+12/12/17:	fixed item interactions and soul pool functionalities (30 mins)

@@ -4,7 +4,13 @@ Things Betwixt
 [TILESET]
 ['stone_wall', 'dirt', 'ladder', 'bird_nest', 'abyss', 'wooden_wall']
 
-[MAP DATA]
+[FIGHTER SET]
+[]
+
+[ITEM SET]
+[]
+
+[MAP TILES]
 4:0:0
 4:0:1
 4:0:2

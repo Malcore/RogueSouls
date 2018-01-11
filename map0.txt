@@ -2,9 +2,15 @@
 Things Betwixt
 
 [TILESET]
-['water', 'stone_wall', 'dirt', 'ladder', 'abyss', 'monument', 'marble_floor', 'wooden_bridge', 'waterfall', 'door_vert', 'door_hor', 'tree', 'stairs_up', 'wooden_floor', 'wooden_wall', 'fog_wall', 'cave_floor', 'stone_stairs_up', 'bonfire']
+['water', 'stone_wall', 'dirt', 'ladder', 'abyss', 'monument', 'marble_floor', 'wooden_bridge', 'waterfall', 'door_vert', 'door_hor', 'tree', 'stairs_up', 'wooden_floor', 'wooden_wall', 'fog_wall', 'cave_floor', 'stone_stairs_up', 'bonfire', 'soul_pool']
 
-[MAP DATA]
+[FIGHTER SET]
+['firekeeper', 'cyclops', 'prowler_hound', 'hollow']
+
+[ITEM SET]
+[]
+
+[MAP TILES]
 4:0:0
 4:0:1
 4:0:2
@@ -2728,7 +2734,7 @@ Things Betwixt
 4:71:22
 4:71:23
 4:71:24
-1:71:25
+14:71:25
 2:71:26
 2:71:27
 4:71:28
@@ -3230,7 +3236,7 @@ Things Betwixt
 4:84:30
 4:84:31
 4:84:32
-6:84:33
+4:84:33
 4:84:34
 4:84:35
 4:84:36
@@ -3804,10 +3810,19 @@ Things Betwixt
 4:99:34
 4:99:35
 4:99:36
--1:99:37
+4:99:37
 
 [MAP LINKS]
 57:27:1
 73:21:2
 85:26:2
 93:36:3
+
+[FIGHTERS]
+58:27:0
+60:25:0
+58:27:0
+60:25:0
+
+[ITEMS]
+
