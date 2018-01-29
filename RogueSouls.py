@@ -26,7 +26,7 @@ MAP_HEIGHT = 38
 MAX_HEIGHT = 100
 MIN_HEIGHT = 0
 
-# stat bars
+# bottom gui panel constants
 BAR_LENGTH = 20
 PANEL_HEIGHT = 12
 PANEL_Y = SCREEN_HEIGHT - PANEL_HEIGHT
@@ -47,8 +47,10 @@ WORLD_FOV_RAD = 4
 TORCH_RADIUS = 10
 
 # combat variables
-# Each action during combat takes a different amount of time, which is modified by equip load, dex, the weight of the
-# item used, etc. The base values for each type of action are given here in frames (20 fps):
+# Each action during combat takes a different amount of time, which is
+#   modified by equip load, dex, the weight of the
+# item used, etc. The base values for each type of action are given here
+#    in frames (20 fps):
 # number of frames for a light attack to complete
 L_ATT_SPEED = 20
 # number of frames for a heavy attack to complete
@@ -65,30 +67,34 @@ TURN_SPEED = 10
 DODGE_TIME = 8
 
 NUMBER_MAPS = 4
-########################################################################################################################
-# Major TODOs                                                                                                          #
-########################################################################################################################
+########################################################################
+# Major TODOs                                                          #
+########################################################################
 # TODO: add real-time gameplay mode
 # TODO: selection between "Classic, Apprentice, and Expert" modes
 # TODO: magic systems
-# TODO: enemy dictionaries, with simple assembly of creatures by choosing sets of stats, ai, and equipment
+# TODO: enemy dictionaries, with simple assembly of creatures by
+#       choosing sets of stats, ai, and equipment
 # TODO: overworld map
 # TODO: location sub-map, procedural generation vs. handcrafted
 # TODO: equipment dictionaries
 # TODO: consumable item dictionaries
 # TODO: random-generation of items
-# TODO: equipment prefix/suffix/addon/enchantment/upgrade dictionaries and systems
+# TODO: equipment prefix/suffix/addon/enchantment/upgrade dictionaries
+#       and systems
 # TODO: level-up systems
 # TODO: crafting systems?
 # TODO: Dark Cloud style world building?
-# TODO: fix soul pool object; soul pool should be consumable item instead of tile, remove from map on death
-########################################################################################################################
+# TODO: fix soul pool object; soul pool should be consumable item
+#       instead of tile, remove from map on death
+########################################################################
 
 
 class Object:
-    def __init__(self, x, y, char, name, color, blocks=True, always_visible=False, block_sight=True, 
-        fighter=None, item=None, player=None, player_interaction=None, fighter_interaction=None, 
-        obj_interaction=None):
+    def __init__(self, x, y, char, name, color, blocks=True,
+                 always_visible=False, block_sight=True, fighter=None, item=None,
+                 player=None, player_interaction=None, fighter_interaction=None,
+                 obj_interaction=None):
         self.x = x
         self.y = y
         self.char = char
@@ -138,7 +144,6 @@ class Object:
 
         if self.player is not None:
             death_coords = (player.x, player.y)
-            death_map_num = map_num
 
         # move by the given amount
         if self.x + dx > MAP_WIDTH - 1 or self.x + dx < 0:
@@ -211,15 +216,16 @@ class Item:
             self.equipment.owner = self
 
     def retrieve_souls(self, obj):
-        global dropped_souls, objects
+        global dropped_souls, objects, spawn_soul_pool
 
         message("You gather your souls.")
-        player.player.souls = dropped_souls
+        player.player.souls += dropped_souls
         dropped_souls = 0
         for obj in objects:
             if obj.name == 'soul_pool':
                 objects.remove(obj)
                 del obj
+        spawn_soul_pool = False
         return True
 
 
@@ -236,9 +242,9 @@ class Equipment:
 
 class Tile:
     # a tile of the map and its properties
-    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, linking=False, 
-        linked_map_num = None, label=None, bg=None, dark_bg=None, player_interaction=None, fighter_interaction=None,
-        obj_interaction=None):
+    def __init__(self, blocked, block_sight=None, char=None, vis_color=None, fog_color=None, linking=False,
+                 linked_map_num=None, label=None, bg=None, dark_bg=None, player_interaction=None, fighter_interaction=None,
+                 obj_interaction=None):
         self.blocked = blocked
 
         # all tiles start unexplored
@@ -299,7 +305,7 @@ class Tile:
         respawn_point = (obj.x, obj.y)
         load_map(map_num)
         return True
-    
+
     def fall_full(self, obj):
         if obj.player is not None:
             message("You fall into the endless abyss.", colors.dark_amber)
@@ -404,8 +410,8 @@ class Tile:
         self.fog_color = colors.west_coast
         self.linking = False
         self.label = "dirt"
-        self.bg = None #colors.light_gray
-        self.dark_bg = None #colors.gray
+        self.bg = None  # colors.light_gray
+        self.dark_bg = None  # colors.gray
 
     def door_vert(self):
         if self.open:
@@ -572,17 +578,6 @@ class Tile:
         self.fog_color = colors.darker_crimson
         self.linking = False
         self.label = "red_fog"
-
-    def soul_pool(self):
-        self.blocked = False
-        self.block_sight = False
-        self.char = 'O'
-        self.vis_color = colors.white
-        self.fog_color = colors.light_gray
-        self.linking = False
-        self.old_tile = self.label
-        self.label = "soul_pool"
-        self.player_interaction = 'retrieve_souls'
 
     def stairs_up(self):
         self.blocked = False
@@ -782,15 +777,15 @@ class Player:
         # TODO: implement level-up system
 
     def respawn(self):
-        global respawn_point, dropped_souls
+        global respawn_point, dropped_souls, spawn_soul_pool
 
         # make souls re-obtainable at death position
-        load_map(respawn_map_num)
         for obj in objects:
             if obj.name == 'soul_pool':
                 objects.remove(obj)
                 del obj
-        create_item('soul_pool', death_coords[0], death_coords[1])
+        spawn_soul_pool = True
+        load_map(respawn_map_num)
         (self.owner.x, self.owner.y) = respawn_point
         self.owner.fighter.curr_hp = self.owner.fighter.hit_points
         dropped_souls = self.souls
@@ -801,7 +796,7 @@ class Player:
 
 class Fighter:
     # defines something that can take combat actions (e.g. any living character) and gives them combat statistics as
-    # well as defining actions they can take during combat
+    #   well as defining actions they can take during combat
     def __init__(self, vig=0, att=0, end=0, strn=0, dex=0, intl=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
                  att_slots=0, rhand1=None, rhand2=None, lhand1=None, lhand2=None, head=None, chest=None, legs=None,
                  arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
@@ -866,10 +861,8 @@ class Fighter:
         # Beginning of derived statistics
 
         # Vigor effects
-        # hp = 2E-07x^6 - 7E-05x^5 + 0.0071x^4 - 0.3803x^3 + 9.908x^2 - 81.809x + 533.94
-        # 403 hp at base (10) vigor
-        # +0.4 res/vig and 0.2 def/vig
-        self.hit_points = int(math.ceil(40*self.vig - 1.15*self.vig))
+        # +0.4 def/vig and 0.2 res/vig
+        self.hit_points = int(math.ceil(40 * self.vig - 1.15 * self.vig))
         self.def_lightn += 0.4 * self.vig
         self.def_mag += 0.4 * self.vig
         self.def_fire += 0.4 * self.vig
@@ -885,10 +878,11 @@ class Fighter:
         self.att_points = 10
 
         # Endurance effects
-        # stamina = 0.0184x2 + 1.2896x + 78.73
+        # stamina = 0.0184x^2 + 1.2896x + 78.73
         # 88 stamina at base (10) endurance
-        # +1.1 lightning res/end, + 0.4 other res/end, and +0.2 elemental def/end
-        self.stamina = math.floor((0.0184 * self.end ** 2) + (1.2896 * self.end) + 78.73)
+        # +1.1 lightning def/end, + 0.4 other def/end, and +0.2 elemental res/end
+        self.stamina = math.floor(
+            (0.0184 * self.end ** 2) + (1.2896 * self.end) + 78.73)
         self.def_lightn += 1.1 * self.end
         self.def_mag += 0.4 * self.end
         self.def_fire += 0.4 * self.end
@@ -1031,7 +1025,8 @@ class Fighter:
             target.death()
 
     def death(self):
-        # TODO: (bug) tile does not appear after removal of creature char, before player action
+        # TODO: (bug) tile does not appear after removal of creature
+        #       char, before player action
         if self.death_func:
             func = self.death_func
             func()
@@ -1040,8 +1035,10 @@ class Fighter:
 
     def equip(self, item):
         success = False
-        options = ['Head', 'Chest', 'Arms', 'Legs', 'Neck', 'Right Hand', 'Left Hand', 'Right Ring', 'Left Ring',
-                   'Right Hand Quick Slot', 'Left Hand Quick Slot']
+        options = ['Head', 'Chest', 'Arms', 'Legs', 'Neck',
+                   'Right Hand', 'Left Hand', 'Right Ring',
+                   'Left Ring', 'Right Hand Quick Slot',
+                   'Left Hand Quick Slot']
         choice = menu("Equip in which slot?", options, SCREEN_WIDTH)
         if choice is None or choice > len(options):
             return
@@ -1091,23 +1088,27 @@ class Fighter:
             success = True
         if success:
             item.is_equipped = True
-            message('Equipped ' + item.owner.owner.name + ' on ' + options[choice] + '.', colors.light_green)
+            message('Equipped ' + item.owner.owner.name + ' on ' +
+                    options[choice] + '.', colors.light_green)
 
     def equip_to_slot(self, equipment, slot):
         if equipment.equippable_at in slot:
             setattr(self, slot, equipment)
             equipment.equipped_at = slot
             equipment.is_equipped = True
-            message("Equipped " + equipment.owner.owner.name + " to " + slot + ".", colors.light_green)
+            message("Equipped " + equipment.owner.owner.name +
+                    " to " + slot + ".", colors.light_green)
         else:
-            message(equipment.owner.owner.name.capitalize() + " cannot be equipped to your " + slot + ".", colors.dark_green)
-
+            message(equipment.owner.owner.name.capitalize() +
+                    " cannot be equipped to your " + slot + ".",
+                    colors.dark_green)
 
     # unequip object and show a message about it
     def unequip(self, equipment):
         if not equipment.is_equipped:
             return
-        message("Unequipped " + equipment.owner.owner.name + " from " + equipment.slot + ".", colors.light_green)
+        message("Unequipped " + equipment.owner.owner.name +
+                " from " + equipment.slot + ".", colors.light_green)
         setattr(self, str(equipment.equipped_at), None)
         equipment.is_equipped = False
         equipment.equipped_at = None
@@ -1147,7 +1148,8 @@ def deal_phys_dmg(target, type, dmg, dmg_type=None):
     target.curr_hp -= final_dmg
     if target.curr_hp <= 0:
         return True
-    message(target.owner.name.capitalize() + " was dealt " + str(final_dmg) + " damage!")
+    message(target.owner.name.capitalize() +
+            " was dealt " + str(final_dmg) + " damage!")
 
 
 def deal_mag_dmg(target, curr_wep):
@@ -1172,7 +1174,8 @@ def deal_lightn_dmg(target, curr_wep):
     dmg_reduc = target.def_lightn / 100
     if dmg_reduc > 1:
         dmg_reduc = 1
-    target.curr_hp -= curr_wep.dmg_lightn - round(dmg_reduc * curr_wep.dmg_lightn)
+    target.curr_hp -= curr_wep.dmg_lightn - \
+        round(dmg_reduc * curr_wep.dmg_lightn)
     if target.curr_hp <= 0:
         return True
 
@@ -1190,28 +1193,32 @@ def deal_dark_dmg(target, curr_wep):
 # functions for damage effects
 #################################
 def add_bleed(target, curr_wep):
-    target.bleed_amt += curr_wep.eff_bleed - round(target.res_bleed / 100 * curr_wep.eff_bleed)
+    target.bleed_amt += curr_wep.eff_bleed - \
+        round(target.res_bleed / 100 * curr_wep.eff_bleed)
 
 
 def add_poison(target, curr_wep):
-    target.poison_amt += curr_wep.eff_poison - round(target.res_poison / 100 * curr_wep.eff_poison)
+    target.poison_amt += curr_wep.eff_poison - \
+        round(target.res_poison / 100 * curr_wep.eff_poison)
 
 
 def add_frost(target, curr_wep):
-    target.frost_amt += curr_wep.eff_frost - round(target.res_frost / 100 * curr_wep.eff_frost)
+    target.frost_amt += curr_wep.eff_frost - \
+        round(target.res_frost / 100 * curr_wep.eff_frost)
 
 
 def add_curse(target, curr_wep):
-    target.curse_amt += curr_wep.eff_curse - round(target.res_curse / 100 * curr_wep.eff_curse)
+    target.curse_amt += curr_wep.eff_curse - \
+        round(target.res_curse / 100 * curr_wep.eff_curse)
 
 
 ############################################
 # death functions
 ############################################
 def player_death():
-    global player, game_state, death_coords, death_map_num
+    global player, game_state, death_map_num
 
-    # TODO: use last button to find last location of player, set as death location
+    death_map_num = map_num
     if player.fighter.curr_hp > 0:
         player.fighter.curr_hp = 0
     if not player.player.undead:
@@ -1219,26 +1226,24 @@ def player_death():
     message("You have died.", colors.dark_crimson)
     player.fighter.wil -= 1
     if player.fighter.wil == 0:
-        message("You no longer have the willpower to continue. Your heart and soul perish, and your body roams mindlessly as a cursed undead.", colors.darker_amber)
+        message("You no longer have the willpower to continue. Your \
+            heart and soul perish, and your body roams mindlessly as a \
+            cursed undead.", colors.darker_amber)
         msgbox("Press any button to return to main menu...", 24)
         game_state = 'game_over'
         return
     else:
         while True:
-            choice = menu("Would you like to continue?", ['I must continue...', 'I cannot go on...'], 24)
-            while True:
-                if choice is 0:
-                    player.player.respawn()
+            choice = menu("Would you like to continue?", [
+                          'I must persevere...', 'I cannot go on...'], 30)
+            if choice is 0:
+                player.player.respawn()
+                return
+            if choice is 1:
+                double_check = menu("Are you certain?", ["Yes", "No"], 24)
+                if double_check == 0:
+                    game_state = 'game_over'
                     return
-                if choice is 1:
-                    double_check = menu("Are you certain?", ["Yes", "No"], 24)
-                    if double_check == 0:
-                        game_state = 'game_over'
-                        return
-                    else:
-                        break
-                else:
-                    break
 
 
 def basic_death(fighter):
@@ -1258,7 +1263,8 @@ def message(new_msg, color=colors.white):
     new_msg_lines = textwrap.wrap(new_msg, MSG_WIDTH)
 
     for line in new_msg_lines:
-        # if the buffer is full, remove the first line to make room for the new one
+        # if the buffer is full, remove the first line to make room for
+        #   the new one
         if len(game_msgs) == MSG_HEIGHT:
             del game_msgs[0]
 
@@ -1272,7 +1278,8 @@ def menu(header, options, width, bg_a=0.7):
         raise ValueError('Cannot have a menu with more than 26 options.')
         # TODO: create support for menus with more than 26 options
 
-    # calculate total height for the header (after textwrap) and one line per option
+    # calculate total height for the header (after textwrap) and one
+    #   line per option
     header_wrapped = textwrap.wrap(header, width)
     header_height = len(header_wrapped)
     height = len(options) + header_height
@@ -1308,7 +1315,8 @@ def menu(header, options, width, bg_a=0.7):
                 user_input = event
                 keypress = True
 
-    # convert the ASCII code to an index; if it corresponds to an option, return it
+    # convert the ASCII code to an index; if it corresponds to an
+    #   option, return it
     if user_input.text:
         index = ord(user_input.text) - ord('a')
     else:
@@ -1318,8 +1326,8 @@ def menu(header, options, width, bg_a=0.7):
     return None
 
 
-#TODO: full-screen menus
-def fullscreen_menu(header, options):
+# TODO: full-screen menus
+def fullscreen_menu(header, options, bg_a=0.7):
     header_wrapped = textwrap.wrap(header, SCREEN_WIDTH)
     header_height = len(header_wrapped)
 
@@ -1327,21 +1335,43 @@ def fullscreen_menu(header, options):
     window = tdl.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
 
     # print the header, with wrapped text
-    window.draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, None, fg=colors.white, bg=None)
+    window.draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                     None, fg=colors.white, bg=None)
     for i, line in enumerate(header_wrapped):
-        window.draw_str(0, 0 + i, header_wrapped[i])
+        window.draw_str(SCREEN_WIDTH // 2 - 10, SCREEN_HEIGHT //
+                        2 - 6 + i, header_wrapped[i])
 
     # print all the options
     y = header_height
     letter_index = ord('a')
     for option_text in options:
         text = '(' + chr(letter_index) + ') ' + option_text
-        window.draw_str(0, y, text, bg=None)
+        window.draw_str(SCREEN_WIDTH // 2 - 11,
+                        SCREEN_HEIGHT // 2 - 5 + y, text, bg=None)
         y += 1
         letter_index += 1
 
-    root.blit(window, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, fg_alpha=1.0, bg_alpha=1.0)
+    root.blit(window, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+              0, 0, fg_alpha=1.0, bg_alpha=bg_a)
     tdl.flush()
+
+    # present the root console to the player and wait for a key-press
+    keypress = False
+    while not keypress:
+        for event in tdl.event.get():
+            if event.type == 'KEYDOWN':
+                user_input = event
+                keypress = True
+
+    # convert the ASCII code to an index; if it corresponds to an
+    #   option, return it
+    if user_input.text:
+        index = ord(user_input.text) - ord('a')
+    else:
+        index = -1
+    if 0 <= index < len(options):
+        return index
+    return None
 
 
 def msgbox(text, width=0):
@@ -1373,7 +1403,8 @@ def get_equipped_in_slot(char, slot):
     # returns the equipment in a slot, or None if it's empty
     for obj in char.inventory:
         if obj.item.equipment and getattr(char, slot) is not None:
-            # obj.item.equipment.slot is obj.item.equipment.is_equipped and slot:
+            # obj.item.equipment.slot is obj.item.equipment.is_equipped
+            #   and slot:
             return obj.item.equipment
     return None
 
@@ -1422,6 +1453,7 @@ def is_facing(self, target):
         if target.x is self.x and target.y <= self.y:
             return True
         return False
+
     if self.owner.fighter.facing is 'E':
         if target.x >= self.x and target.y is self.y:
             return True
@@ -1451,9 +1483,9 @@ def in_front(self, dir):
 
 def distance_to(self, other):
         # return the distance to another object
-        dx = other.x - self.x
-        dy = other.y - self.y
-        return math.sqrt(dx ** 2 + dy ** 2)
+    dx = other.x - self.x
+    dy = other.y - self.y
+    return math.sqrt(dx ** 2 + dy ** 2)
 
 
 def occupied(x, y):
@@ -1482,35 +1514,36 @@ def pick_up():
 def close_doors(x, y):
     global current_map
 
-    if current_map[x-1][y-1].label in door_tiles:
+    if current_map[x - 1][y - 1].label in door_tiles:
         dx = -1
         dy = -1
-    elif current_map[x][y-1].label in door_tiles:
+    elif current_map[x][y - 1].label in door_tiles:
         dx = 0
         dy = -1
-    elif current_map[x+1][y-1].label in door_tiles:
+    elif current_map[x + 1][y - 1].label in door_tiles:
         dx = 1
         dy = -1
-    elif current_map[x+1][y].label in door_tiles:
+    elif current_map[x + 1][y].label in door_tiles:
         dx = 1
         dy = 0
-    elif current_map[x+1][y+1].label in door_tiles:
+    elif current_map[x + 1][y + 1].label in door_tiles:
         dx = 1
         dy = 1
-    elif current_map[x][y+1].label in door_tiles:
+    elif current_map[x][y + 1].label in door_tiles:
         dx = 0
         dy = 1
-    elif current_map[x-1][y+1].label in door_tiles:
+    elif current_map[x - 1][y + 1].label in door_tiles:
         dx = -1
         dy = 1
-    elif current_map[x-1][y].label in door_tiles:
+    elif current_map[x - 1][y].label in door_tiles:
         dx = -1
         dy = 0
     else:
         return
     if current_map[x + dx][y + dy].open:
         current_map[x + dx][y + dy].open = False
-        getattr(current_map[x + dx][y + dy], current_map[x + dx][y + dy].label)()
+        getattr(current_map[x + dx][y + dy],
+                current_map[x + dx][y + dy].label)()
         message("You close the door...", colors.darker_green)
 
 
@@ -1518,7 +1551,8 @@ def close_doors(x, y):
 # player interaction functions
 ############################################
 def handle_keys(command=None):
-    global fov_recompute, game_state, mouse_coord, last_button, map_tiles, fill_mode, fighter_mode, right_click_flag, map_num
+    global fov_recompute, game_state, mouse_coord, map_tiles, fill_mode
+    global fighter_mode, right_click_flag, map_num
 
     keypress = False
     right_click_flag = False
@@ -1550,7 +1584,9 @@ def handle_keys(command=None):
 
         elif user_input.key == 'ESCAPE':
             # game menu
-            choice = menu('Game Menu', ['Main Menu', 'Character Screen', 'Help'], 24)
+            choice = menu(
+                'Game Menu', ['Main Menu', 'Character Screen', 'Help'],
+                30)
             if choice is 0:
                 double_check = menu('Are you sure?', ['No', 'Yes'], 24)
                 if double_check:
@@ -1566,61 +1602,56 @@ def handle_keys(command=None):
                 message("Not yet implemented")
                 return
 
+        elif debug_mode:
+            if user_input.key == 'F1':
+                for obj in objects:
+                    output = obj.name + \
+                        " at (" + str(obj.x) + ", " + str(obj.y) + ")"
+                    message(output)
+
         if game_state == 'playing' or game_state == 'simulating':
-            if user_input.text:
-                last_button = user_input.text
-            else:
-                last_button = user_input.key
             # movement keys
             if user_input.key == 'UP' or user_input.text == '8':
                 player.move(0, -1)
-                last_button = '8'
                 return "MV N"
 
             elif user_input.key == 'DOWN' or user_input.text == '2':
                 player.move(0, 1)
-                last_button = '2'
                 return "MV S"
 
             elif user_input.key == 'LEFT' or user_input.text == '4':
                 player.move(-1, 0)
-                last_button = '4'
                 return "MV W"
 
             elif user_input.key == 'RIGHT' or user_input.text == '6':
                 player.move(1, 0)
-                last_button = '6'
                 return "MV E"
 
             elif user_input.key == 'TEXT':
                 if user_input.text == '7':
                     player.move(-1, -1)
-                    last_button = '7'
                     return "MV NW"
 
                 elif user_input.text == '9':
                     player.move(1, -1)
-                    last_button = '9'
                     return "MV NE"
 
                 elif user_input.text == '1':
                     player.move(-1, 1)
-                    last_button = '1'
                     return "MV SW"
 
                 elif user_input.text == '3':
                     player.move(1, 1)
-                    last_button = '3'
                     return "MV SE"
 
-                elif user_input.text =='5':
+                elif user_input.text == '5':
                     player.move(0, 0)
-                    last_button = '5'
                     return "WAIT"
 
                 elif user_input.text == 'i':
                     choice = inventory_menu()
-                    if choice is not None and choice < len(player.fighter.inventory):
+                    if choice is not None and choice < len(
+                            player.fighter.inventory):
                         item = player.fighter.inventory[choice]
                         player.fighter.equip(item.item.equipment)
 
@@ -1646,21 +1677,19 @@ def handle_keys(command=None):
                 elif user_input.text == 'l':
                     player.fighter.handle_attack_move("right", "normal")
 
-                elif user_input.text == '>':
-                    enter_location(player.x, player.y)
-
-                elif user_input.text == '<':
-                    exit_location(player.x, player.y)
                 elif user_input.text == 'E':
                     # open edit mode
-                    message("Entering edit mode! Current tile order: " + str(map_tiles), colors.light_azure)
+                    message("Entering edit mode! Current tile order: " +
+                            str(map_tiles), colors.light_azure)
                     for y in range(MAP_HEIGHT):
                         for x in range(MAP_WIDTH):
                             current_map[x][y].explored = True
                     game_state = 'editing'
                     edit_mode()
+
                 elif user_input.text == 'S':
                     message("Game saved!", colors.green)
+
                 elif user_input.text == 'c':
                     close_doors(player.x, player.y)
 
@@ -1691,17 +1720,24 @@ def handle_keys(command=None):
                         map_tiles.remove(map_tiles[choice])
             elif user_input.text == 'T':
                 if not fighter_mode:
-                    message("Left/Right click to place fighters on map.", colors.light_red)
+                    message("Left/Right click to place fighters on map.",
+                            colors.light_red)
                     fighter_mode = True
                 else:
-                    message("Leaving fighter placement mode.", colors.light_red)
+                    message("Leaving fighter placement mode.",
+                            colors.light_red)
                     fighter_mode = False
             elif user_input.key == 'PAGEUP':
                 temp_map_num = int(map_num) + 1
                 try:
                     load_map(temp_map_num)
                 except AttributeError:
-                    message("Map" + temp_map_num +".txt is empty and could not be loaded!", colors.red)
+                    message("Map" + str(temp_map_num) +
+                            ".txt is empty and could not be loaded!",
+                            colors.red)
+                except IOError:
+                    message("Map" + str(temp_map_num) +
+                            ".txt does not exist!", colors.red)
                 else:
                     map_num = temp_map_num
             elif user_input.key == 'PAGEDOWN':
@@ -1709,7 +1745,12 @@ def handle_keys(command=None):
                 try:
                     load_map(temp_map_num)
                 except AttributeError:
-                    message("Map" + temp_map_num +".txt is empty and could not be loaded!", colors.red)
+                    message("Map" + str(temp_map_num) +
+                            ".txt is empty and could not be loaded!",
+                            colors.red)
+                except IOError:
+                    message("Map" + str(temp_map_num) +
+                            ".txt does not exist!", colors.red)
                 else:
                     map_num = temp_map_num
     else:
@@ -1761,9 +1802,11 @@ def get_names_under_mouse():
     # return a string with the names of all objects under the mouse
     (x, y) = mouse_coord
 
-    # create a list with the names of all objects at the mouse's coordinates and in FOV
+    # create a list with the names of all objects at the mouse's
+    #   coordinates and in FOV
     names = [obj.name for obj in objects
-             if obj.x == x and obj.y == y and (obj.x, obj.y) in visible_tiles]
+             if obj.x == x and obj.y == y and (obj.x, obj.y) in
+             visible_tiles]
 
     names = ', '.join(names)  # join the names, separated by commas
     return names.capitalize()
@@ -1774,8 +1817,10 @@ def get_tile_under_mouse():
     # return a string with the names of all objects under the mouse
     (x, y) = mouse_coord
 
-    # create a list with the names of all objects at the mouse's coordinates and in FOV
-    if x < MAP_WIDTH and x >= 0 and y < MAP_HEIGHT and y >= 0 and current_map[x][y].explored == True:
+    # create a list with the names of all objects at the mouse's
+    #   coordinates and in FOV
+    if x < MAP_WIDTH and x >= 0 and y < MAP_HEIGHT and y >= 0 and \
+            current_map[x][y].explored is True:
         tile = current_map[x][y].label
     else:
         tile = 'unknown'
@@ -1793,7 +1838,8 @@ def inventory_menu():
     return index
 
 
-# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6, rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
+# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6,
+#   rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
 def equip_or_unequip(fighter, index):
     if index is None or index > 10:
         return
@@ -1810,50 +1856,62 @@ def equip_or_unequip(fighter, index):
 
 
 def equipment_menu():
-    # TODO: fix equipment menu by showing each equipment slot and what is currently equipped there
+    # TODO: fix equipment menu by showing each equipment slot and what
+    #   is currently equipped there
     options = []
     if player.fighter.head:
-        options.append("Head: " + str(player.fighter.head.owner.owner.name).capitalize())
+        options.append(
+            "Head: " + str(player.fighter.head.owner.owner.name).capitalize())
     else:
         options.append("Head: None")
     if player.fighter.chest:
-        options.append("Chest: " + str(player.fighter.chest.owner.owner.name).capitalize())
+        options.append(
+            "Chest: " + str(player.fighter.chest.owner.owner.name).capitalize())
     else:
         options.append("Chest: None")
     if player.fighter.arms:
-        options.append("Arms: " + str(player.fighter.arms.owner.owner.name).capitalize())
+        options.append(
+            "Arms: " + str(player.fighter.arms.owner.owner.name).capitalize())
     else:
         options.append("Arms: None")
     if player.fighter.legs:
-        options.append("Legs: " + str(player.fighter.legs.owner.owner.name).capitalize())
+        options.append(
+            "Legs: " + str(player.fighter.legs.owner.owner.name).capitalize())
     else:
         options.append("Legs: None")
     if player.fighter.neck:
-        options.append("Neck: " + str(player.fighter.neck.owner.owner.name).capitalize())
+        options.append(
+            "Neck: " + str(player.fighter.neck.owner.owner.name).capitalize())
     else:
         options.append("Necks: None")
     if player.fighter.ring1:
-        options.append("Right Ring: " + str(player.fighter.ring1.owner.owner.name).capitalize())
+        options.append("Right Ring: " +
+                       str(player.fighter.ring1.owner.owner.name).capitalize())
     else:
         options.append("Right Ring: None")
     if player.fighter.ring2:
-        options.append("Left Ring: " + str(player.fighter.ring2.owner.owner.name).capitalize())
+        options.append("Left Ring: " +
+                       str(player.fighter.ring2.owner.owner.name).capitalize())
     else:
         options.append("Left Ring: None")
     if player.fighter.rhand1:
-        options.append("Right Hand: " + str(player.fighter.rhand1.owner.owner.name).capitalize())
+        options.append(
+            "Right Hand: " + str(player.fighter.rhand1.owner.owner.name).capitalize())
     else:
         options.append("Right Hand: None")
     if player.fighter.lhand1:
-        options.append("Left Hand: " + str(player.fighter.lhand1.owner.owner.name).capitalize())
+        options.append(
+            "Left Hand: " + str(player.fighter.lhand1.owner.owner.name).capitalize())
     else:
         options.append("Left Hand: None")
     if player.fighter.rhand2:
-        options.append("Right Quickslot: " + str(player.fighter.rhand2.owner.owner.name).capitalize())
+        options.append("Right Quickslot: " +
+                       str(player.fighter.rhand2.owner.owner.name).capitalize())
     else:
         options.append("Right Quickslot: None")
     if player.fighter.lhand2:
-        options.append("Left Quickslot: " + str(player.fighter.lhand2.owner.owner.name).capitalize())
+        options.append("Left Quickslot: " +
+                       str(player.fighter.lhand2.owner.owner.name).capitalize())
     else:
         options.append("Left Quickslot: None")
     options.append("Close menu")
@@ -1877,42 +1935,43 @@ def next_floor():
 ############################################
 # map and world functions
 ############################################
-def change_map(new_map, label, new_num):
+def load_map(map_num):
+    global objects
+
+    objects = []
+    objects.append(player)
+    change_map(*load_map_from_file(map_num))
+
+
+def change_map(next_map, label, new_num):
     global current_map, old_map, fov_recompute, map_changed, map_label, map_num
 
     if current_map:
         old_map = current_map
-    current_map = new_map
+    current_map = next_map
     fov_recompute = True
     map_changed = True
     map_label = label
     map_num = new_num
-    objects = []
-    objects.append(player)
-    # objects.append(current_map.objects)
 
-
-def load_map(map_num):
-    try:
-        change_map(*load_map_from_file(map_num))
-    except IOError:
-        print("Map " + str(map_num), "not found. Exception in load_map().")
-        quit_game()
+    # add all temporary objects to map that belong there
+    if map_num == death_map_num and spawn_soul_pool is True:
+        create_item('soul_pool', death_coords[0], death_coords[1])
 
 
 def load_map_from_file(map_num):
     global level_map, map_tiles, map_fighters
 
     level_map = [[Tile(False)
-                    for y in range(MAP_HEIGHT)]
-                    for x in range(MAP_WIDTH)]
+                  for y in range(MAP_HEIGHT)]
+                 for x in range(MAP_WIDTH)]
 
     map_label = None
     map_tiles = None
     map_fighters = None
     lastline = None
     file_label = None
-    file_name = "map" + str(map_num) + ".txt"
+    file_name = "./maps/map" + str(map_num) + ".txt"
     with open(file_name) as f:
         for line in f.readlines():
             line = line.replace('\n', '')
@@ -1942,21 +2001,24 @@ def load_map_from_file(map_num):
                 elif line != '':
                     content = line.split(':')
                     if int(content[0]) != -1:
-                        getattr(level_map[int(content[1])][int(content[2])], map_tiles[int(content[0])])()
+                        getattr(level_map[int(content[1])][int(
+                            content[2])], map_tiles[int(content[0])])()
             elif file_label == "[MAP LINKS]":
                 if line == "[FIGHTERS]":
                     file_label = line
                 elif line != '':
                     content = line.split(':')
-                    setattr(level_map[int(content[0])][int(content[1])], "linked_map_num", content[2])
+                    setattr(level_map[int(content[0])][int(
+                        content[1])], "linked_map_num", content[2])
             elif file_label == "[FIGHTERS]":
                 content = line.split(':')
                 if len(content) == 3:
-                    create_fighter(map_fighters[int(content[2])], int(content[0]), int(content[1]))
+                    create_fighter(map_fighters[int(content[2])], int(
+                        content[0]), int(content[1]))
             elif file_label == "[ITEMS]":
                 content = line.split(':')
                 if len(content) == 3:
-                    #create_item()
+                    # create_item()
                     pass
             elif file_label is None:
                 file_label = line
@@ -1965,25 +2027,27 @@ def load_map_from_file(map_num):
 
 
 def change_level(x, y):
-    global current_map
+    global current_map, death_coords
 
+    death_coords = (player.x, player.y)
     load_map(current_map[x][y].linked_map_num)
 
 
 ############################################
 # rendering functions
 ############################################
-# TODO: implement weather effects 
+# TODO: implement weather effects
 def render_all():
     global fov_recompute, visible_tiles, current_map, map_changed
 
     if map_changed:
         map_changed = False
         con.clear()
-    
+
     if fov_recompute:
         fov_recompute = False
-        visible_tiles = tdl.map.quickFOV(player.x, player.y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
+        visible_tiles = tdl.map.quickFOV(
+            player.x, player.y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
 
         # go through all tiles, and set their background color according to the FOV
         for y in range(MAP_HEIGHT):
@@ -1992,11 +2056,13 @@ def render_all():
                 if not visible:
                     # if it's not visible right now, the player can only see it if it's explored
                     if current_map[x][y].explored:
-                        con.draw_char(x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=current_map[x][y].dark_bg)
+                        con.draw_char(
+                            x, y, current_map[x][y].char, current_map[x][y].fog_color, bg=current_map[x][y].dark_bg)
                     else:
                         con.draw_char(x, y, None, None, bg=None)
                 else:
-                    con.draw_char(x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=current_map[x][y].bg)
+                    con.draw_char(
+                        x, y, current_map[x][y].char, current_map[x][y].vis_color, bg=current_map[x][y].bg)
 
                     # since it's visible, explore it
                     current_map[x][y].explored = True
@@ -2007,7 +2073,7 @@ def render_all():
                 if (obj.x, obj.y) in visible_tiles or obj.always_visible:
                     obj.draw()
         player.draw()
-    
+
     # blit the contents of "con" to the root console and present it
     root.blit(con, 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0)
 
@@ -2031,13 +2097,21 @@ def render_gui():
                colors.dark_red, colors.darker_red)
     render_bar(1, 3, BAR_LENGTH, 'Stamina', player.fighter.curr_stam, player.fighter.stamina,
                colors.dark_green, colors.darker_green)
-    panel.draw_str(1, 5, "Souls: " + str(player.player.souls), bg=None, fg=colors.white)
-    panel.draw_str(1, 7, "Willpower: " + str(player.fighter.wil), bg=None, fg=colors.white)
+    panel.draw_str(1, 5, "Souls: " + str(player.player.souls),
+                   bg=None, fg=colors.white)
+    panel.draw_str(1, 7, "Willpower: " + str(player.fighter.wil),
+                   bg=None, fg=colors.white)
 
     # display names of objects under the mouse
     if mouse_coord:
-        panel.draw_str(1, 0, get_names_under_mouse(), bg=None, fg=colors.light_gray)
-        panel.draw_str(1, -1, get_tile_under_mouse(), bg=None, fg=colors.light_gray)
+        panel.draw_str(1, 0, get_names_under_mouse(),
+                       bg=None, fg=colors.light_gray)
+        panel.draw_str(1, -1, get_tile_under_mouse(),
+                       bg=None, fg=colors.light_gray)
+
+    if game_state == 'editing':
+        panel.draw_str(SCREEN_WIDTH - 20, PANEL_HEIGHT - 1, "Map File: map" +
+                       str(map_num) + ".txt", bg=None, fg=colors.white)
 
     # blit the contents of "panel" to the root console
     root.blit(panel, 0, PANEL_Y, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0)
@@ -2059,7 +2133,8 @@ def is_visible_tile(x, y):
 
 
 def explore_tiles(x, y):
-    visible_tiles = tdl.map.quickFOV(x, y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
+    visible_tiles = tdl.map.quickFOV(
+        x, y, is_visible_tile, fov=FOV_ALGO, radius=WORLD_FOV_RAD, lightWalls=FOV_LIGHT_WALLS)
     for (x, y) in visible_tiles:
         current_map[x][y].explored = True
 
@@ -2068,11 +2143,12 @@ def explore_tiles(x, y):
 # real-time functions
 ############################################
 def update_queue():
-    # for each fighter in objects:
-    #   for each action in fighter.action_queue:
-    #       action.timer -= 1
-    #       if action.timer is 0:
-    #           action.effect()
+    # while(in_combat):
+    #   for each fighter in objects:
+    #       for each action in fighter.action_queue:
+    #           action.timer -= 1
+    #           if action.timer is 0:
+    #               action.effect()
     return
 
 
@@ -2097,14 +2173,17 @@ def edit_mode(click_coords=None):
                         if current_map[x][y].label in map_tiles:
                             if not right_click_flag:
                                 if map_tiles.index(current_map[x][y].label) + 1 < len(map_tiles):
-                                    getattr(current_map[x][y], map_tiles[map_tiles.index(current_map[x][y].label) + 1])()
+                                    getattr(current_map[x][y], map_tiles[map_tiles.index(
+                                        current_map[x][y].label) + 1])()
                                 else:
                                     getattr(current_map[x][y], map_tiles[0])()
                             else:
                                 if map_tiles.index(current_map[x][y].label) - 1 >= 0:
-                                    getattr(current_map[x][y], map_tiles[map_tiles.index(current_map[x][y].label) - 1])()
+                                    getattr(current_map[x][y], map_tiles[map_tiles.index(
+                                        current_map[x][y].label) - 1])()
                                 else:
-                                    getattr(current_map[x][y], map_tiles[len(map_tiles) - 1])()
+                                    getattr(
+                                        current_map[x][y], map_tiles[len(map_tiles) - 1])()
                         else:
                             getattr(current_map[x][y], map_tiles[0])()
 
@@ -2114,7 +2193,7 @@ def edit_mode(click_coords=None):
 def save_map():
     global current_map, objects, map_num, map_tiles, map_label
 
-    map_file = open("map" + str(map_num) + ".txt", "w")
+    map_file = open("./maps/map" + str(map_num) + ".txt", "w")
     map_file.write("[MAP LABEL]\n")
     map_file.write(map_label + "\n\n")
     map_file.write("[TILESET]\n")
@@ -2146,15 +2225,18 @@ def save_map():
                     linked_map_num = None
                     while linked_map_num is None:
                         message("The tile at (" + str(x) + ", " + str(y) + ") (" + current_map[x][y].label +
-                        ") is not linked. Please enter the number of the map you wish to link it to and press enter.", colors.orange)
+                                ") is not linked. Please enter the number of the map you wish to link it to and press enter.", colors.orange)
                         try:
                             input_str = link_tiles(x, y)
                             linked_map_num = int(input_str)
                         except(ValueError):
-                            message("Input of " + input_str + " cannot be converted to a number. Please try again.", colors.red)
-                    message("The number you selected was " + input_str + ".", colors.azure)
+                            message(
+                                "Input of " + input_str + " cannot be converted to a number. Please try again.", colors.red)
+                    message("The number you selected was " +
+                            input_str + ".", colors.azure)
                     current_map[x][y].linked_map_num = linked_map_num
-                map_file.write(str(x) + ':' + str(y) + ':' + str(linked_map_num))
+                map_file.write(str(x) + ':' + str(y) +
+                               ':' + str(linked_map_num))
                 map_file.write("\n")
 
     map_file.write("\n")
@@ -2162,13 +2244,15 @@ def save_map():
     map_file.write("[FIGHTERS]\n")
     for obj in objects:
         if obj.fighter is not None and obj.player is None:
-            map_file.write(str(obj.x) + ':' + str(obj.y) + ':' + str(map_fighters.index(obj.name)) + "\n")
+            map_file.write(str(obj.x) + ':' + str(obj.y) + ':' +
+                           str(map_fighters.index(obj.name)) + "\n")
     map_file.write("\n")
 
     map_file.write("[ITEMS]\n")
     for obj in objects:
         if obj.item is not None:
-            map_file.write(str(obj.x) + ':' + str(oby.y) + ':' + str(map_items.index(obj.name)) + "\n")
+            map_file.write(str(obj.x) + ':' + str(oby.y) + ':' +
+                           str(map_items.index(obj.name)) + "\n")
     map_file.write("\n")
 
     map_file.close()
@@ -2186,7 +2270,8 @@ def fill_area(target_type, x, y):
     else:
         flood_fill(x, y, target_type, map_tiles[replacement_type])
         if max_recurse_flag:
-            message("Reached maximum recursion depth, please fill additional areas separately.", colors.dark_red)
+            message(
+                "Reached maximum recursion depth, please fill additional areas separately.", colors.dark_red)
 
 
 def flood_fill(x, y, target_type, replacement_type):
@@ -2204,17 +2289,27 @@ def flood_fill(x, y, target_type, replacement_type):
         return
     recurse_count += 1
     getattr(current_map[x][y], replacement_type)()
-    flood_fill(x, y+1, target_type, replacement_type) # south
-    flood_fill(x, y-1, target_type, replacement_type) # north
-    flood_fill(x+1, y, target_type, replacement_type) # east
-    flood_fill(x-1, y, target_type, replacement_type) # west
+    flood_fill(x, y + 1, target_type, replacement_type)  # south
+    flood_fill(x, y - 1, target_type, replacement_type)  # north
+    flood_fill(x + 1, y, target_type, replacement_type)  # east
+    flood_fill(x - 1, y, target_type, replacement_type)  # west
     recurse_count -= 1
     return
 
 
-def place_fighter(x, y):
-    global objects, map_fighters, right_click_flag
+def place_object(x, y):
+    obj_type = menu("Which type of object would you like to place?", [
+                    "Fighters", "Items", "Other"], 30)
+    if obj_type is 0:
+        place_fighter(x, y)
+    elif obj_type is 1:
+        place_item(x, y)
+    elif obj_type is 2:
+        # place special/general types of objects?
+        pass
 
+
+def place_fighter(x, y):
     choice = menu("Which fighter would you like to place?", map_fighters, 30)
     if choice is not None:
         if choice < len(map_fighters):
@@ -2226,10 +2321,11 @@ def create_fighter(name, x, y):
     global objects
 
     fdict = dicts.fighters[name]
-    fighter_comp = Fighter(fdict['vig'], fdict['att'], fdict['end'], fdict['strn'], 
-        fdict['dex'], fdict['intl'], fdict['fai'], fdict['luc'], fdict['wil'], level=fdict['level'],
-        soul_value=fdict['soul_value'])
-    fighter = Object(x, y, fdict['char'], name, getattr(colors, fdict['color']), fighter=fighter_comp)
+    fighter_comp = Fighter(fdict['vig'], fdict['att'], fdict['end'], fdict['strn'],
+                           fdict['dex'], fdict['intl'], fdict['fai'], fdict['luc'], fdict['wil'], level=fdict['level'],
+                           soul_value=fdict['soul_value'])
+    fighter = Object(x, y, fdict['char'], name, getattr(
+        colors, fdict['color']), fighter=fighter_comp)
     objects.append(fighter)
 
 
@@ -2238,8 +2334,19 @@ def remove_fighter(x, y):
 
     for obj in objects:
         if obj.x == x and obj.y == y:
-            objects.remove(obj)
-            del obj
+            if obj.fighter is not None:
+                objects.remove(obj)
+                del obj
+
+
+def place_item(x, y):
+    global objects
+
+    choice = menu("Which item would you like to place?", map_items, 30)
+    if choice is not None:
+        if choice < len(map_items):
+            name = map_items[choice]
+            create_item(name, x, y)
 
 
 def create_item(name, x, y):
@@ -2248,14 +2355,20 @@ def create_item(name, x, y):
     item_type = dicts.items[name]
     idict = getattr(dicts, item_type)[name]
     item_comp = Item()
-    item = Object(x, y, idict['char'], name, getattr(colors, idict['color']), item=item_comp, 
-        obj_interaction=idict['object_interaction'], fighter_interaction=idict['fighter_interaction'],
-         player_interaction=idict['player_interaction'])
+    item = Object(x, y, idict['char'], name, getattr(colors, idict['color']), item=item_comp,
+                  obj_interaction=idict['object_interaction'], fighter_interaction=idict['fighter_interaction'],
+                  player_interaction=idict['player_interaction'])
     objects.append(item)
 
 
-def remove_item():
-    return
+def remove_item(x, y):
+    global objects
+
+    for obj in objects:
+        if obj.x == x and obj.y == y:
+            if obj.item is not None:
+                objects.remove(obj)
+                del obj
 
 
 def link_tiles(x, y):
@@ -2268,22 +2381,24 @@ def link_tiles(x, y):
 
 
 def new_map(map_num):
-    global map_tiles, map_label
-
-    choice = menu("Make a new map of number " + str(map_num) + "?", ["No", "Yes"], 24)
+    choice = menu("Make a new map of number " +
+                  str(map_num) + "?", ["No", "Yes"], 24)
 
     if choice:
-        file_name = "map" + str(map_num) + ".txt"
+        file_name = "./maps/map" + str(map_num) + ".txt"
         try:
             map_file = open(file_name, 'r')
         except IOError:
             map_file = open(file_name, 'w')
             map_file.write("[MAP LABEL]\n")
-            map_file.write(map_label + "\n")
+            map_file.write(map_label + "\n\n")
             map_file.write("[TILESET]\n")
             map_file.write(str(map_tiles) + "\n\n")
+            map_file.write("[FIGHTER SET]\n")
+            map_file.write(str(map_fighters) + "\n\n")
+            map_file.write("[ITEM SET]\n")
+            map_file.write(str(map_items) + "\n\n")
             map_file.write("[MAP TILES]\n")
-            map
         else:
             message("A map with the given number already exists.", colors.red)
         map_file.close()
@@ -2293,10 +2408,11 @@ def new_map(map_num):
 
 ############################################
 # intro screen functions
-############################################()
+# ()
 def main_menu():
-    global game_state, game_msgs, objects, map_num, player_action
-    # img = libtcod.image_load('menu_background2.png')
+    global game_state, game_msgs, objects, map_num, player_action, debug_mode
+
+    # img = libtcod.image_load('img/menu_background2.png')
     game_state = 'menu'
     game_msgs = []
     objects = []
@@ -2307,11 +2423,14 @@ def main_menu():
         # show the background image, at twice the regular console resolution
         # libtcod.image_blit_2x(img, 0, 8, 3)
 
-        root.draw_str(SCREEN_WIDTH // 2 - 7, SCREEN_HEIGHT // 2 - 12, 'RogueSouls', fg=colors.crimson, bg=colors.darkest_han)
-        root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT // 2 - 10, 'By Jerezereh')
+        root.draw_str(SCREEN_WIDTH // 2 - 7, SCREEN_HEIGHT // 2 -
+                      12, 'RogueSouls', fg=colors.crimson, bg=colors.darkest_han)
+        root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT //
+                      2 - 10, 'By Jerezereh')
 
         # show options and wait for the player's choice
-        choice = menu('', ['Play a new game', 'Continue last game', 'Quit'], 24)
+        choice = menu(
+            '', ['Play a new game', 'Continue last game', 'Quit', 'Debug'], 24)
 
         # new game
         if choice is 0:
@@ -2329,6 +2448,12 @@ def main_menu():
         # quit
         elif choice is 2:
             exit()
+        elif choice is 3:
+            initialize_variables()
+            debug_mode = True
+            new_game()
+            save_game()
+            play_game()
 
 
 def new_game():
@@ -2340,8 +2465,10 @@ def new_game():
 
     # first create the player out of its components
     player_comp = Player()
-    fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10, 10, 3, death_func=player_death)
-    player = Object(entry_coords[0], entry_coords[1], '@', "Player", colors.gray, fighter=fighter_comp, player=player_comp)
+    fighter_comp = Fighter(10, 10, 10, 10, 10, 10, 10,
+                           10, 3, death_func=player_death)
+    player = Object(entry_coords[0], entry_coords[1], '@', "Player",
+                    colors.gray, fighter=fighter_comp, player=player_comp)
     objects.append(player)
 
     # load map0.txt and draw to screen
@@ -2349,14 +2476,15 @@ def new_game():
 
     #enemy_fighter_comp = Fighter(1, 1, 1, 1, 1, 1, 1, 1, 1)
     #enemy = Object(12, 26, 'T', "Test Enemy", colors.dark_red, fighter=enemy_fighter_comp)
-    #objects.append(enemy)
+    # objects.append(enemy)
 
     # a warm welcoming message!
     message('You awaken with a burning desire to act. You feel as if you should recognize this place.', colors.light_flame)
     #message("The seed of this game is: " + str(seed) + ".")
 
     # initial equipment: a broken sword
-    equipment_component = Equipment(slot='hand', durability=10, equippable_at = 'hand')
+    equipment_component = Equipment(
+        slot='hand', durability=10, equippable_at='hand')
     item_comp = Item(weight=2, uses=0, equipment=equipment_component)
     sword = Object(0, 0, '-', name="Broken Sword", color=colors.sky, block_sight=False, item=item_comp,
                    always_visible=True)
@@ -2394,6 +2522,35 @@ def play_game():
 
         if game_state == 'game_over':
             return
+
+# TODO: finish new save_game function
+
+
+def save_game():
+    file_name = player.name + "_savegame"
+    sf = shelve.open("./saves/" + file_name, 'n')
+    sf['seed'] = seed
+    sf['game_msgs'] = game_msgs
+    sf['respawn_point'] = respawn_point
+    sf['respawn_map_num'] = respawn_map_num
+    sf['dropped_souls'] = dropped_souls
+    sf['death_coords'] = death_coords
+    sf['death_map_num'] = death_map_num
+    sf['player_action'] = player_action
+    sf['game_state'] = game_state
+    sf['']
+
+
+objects = []  # everything in the game that isn't a tile
+
+map_num = 0
+map_changed = False
+current_map = []
+level_map = []
+map_tiles = []
+map_fighters = []
+map_items = []
+map_label = ""
 
 
 def save_game():
@@ -2435,7 +2592,7 @@ def load_game_menu():
 
 
 def load_game(file_name):
-    #open the previously saved shelve and load the game data
+    # open the previously saved shelve and load the game data
     global seed, objects, map_num, filename
 
     filename = file_name
@@ -2485,20 +2642,20 @@ def simulate_actions(player_actions):
 
 
 def initialize_variables():
-    global objects, game_msgs, last_button, entry_coords, respawn_point, respawn_map_num, dropped_souls
+    global objects, game_msgs, entry_coords, respawn_point, respawn_map_num, dropped_souls
     global death_coords, death_map_num, fov_recompute, player_action, mouse_coord, game_state
     global map_num, map_changed, current_map, level_map, map_tiles, map_label, map_fighters, map_items
     global fill_mode, fighter_mode, recurse_count, max_recurse_flag, seed, filename
 
     objects = []  # everything in the game that isn't a tile
     game_msgs = []  # buffer of the messages that appear on the screen
-    last_button = ''
     entry_coords = (12, 24)
     respawn_point = entry_coords
     respawn_map_num = 0
     dropped_souls = 0
     death_coords = None
     death_map_num = None
+    spawn_soul_pool = False
 
     fov_recompute = True
     player_action = None
@@ -2518,6 +2675,7 @@ def initialize_variables():
     fighter_mode = False
     recurse_count = 0
     max_recurse_flag = False
+    debug_mode = False
 
     seed = 0
     filename = ''
@@ -2526,22 +2684,22 @@ def initialize_variables():
 #############################################
 # Initialization & Main Loop                #
 #############################################
-#tdl.set_font('terminal12x12_gs_ro.png', greyscale=True, altLayout=False)
-tdl.set_font('unifont_9x15.png')
+tdl.set_font('img/unifont_9x15.png')
 tdl.setFPS(LIMIT_FPS)
-root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="RogueSouls", fullscreen=False)
+root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT,
+                title="RogueSouls", fullscreen=False)
 con = tdl.Console(MAP_WIDTH, MAP_HEIGHT)
 panel = tdl.Console(SCREEN_WIDTH, PANEL_HEIGHT)
 
 objects = []  # everything in the game that isn't a tile
 game_msgs = []  # buffer of the messages that appear on the screen
-last_button = ''
 entry_coords = (12, 24)
 respawn_point = entry_coords
 respawn_map_num = 0
 dropped_souls = 0
 death_coords = None
 death_map_num = None
+spawn_soul_pool = False
 
 fov_recompute = True
 player_action = None
@@ -2561,12 +2719,14 @@ fill_mode = False
 fighter_mode = False
 recurse_count = 0
 max_recurse_flag = False
+debug_mode = False
 
 seed = 0
 filename = ''
 
 door_tiles = ['door_hor', 'door_vert']
 special_tiles = ['fog_wall']
-equipment_slots = ['head', 'chest', 'arms', 'legs', 'neck', 'rring', 'lring', 'rhand1', 'rhand2', 'lhand1', 'lhand2']
+equipment_slots = ['head', 'chest', 'arms', 'legs', 'neck',
+                   'rring', 'lring', 'rhand1', 'rhand2', 'lhand1', 'lhand2']
 
 main_menu()

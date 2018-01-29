@@ -1,0 +1,13 @@
+[MAP LABEL]
+Things Betwixt
+
+[TILESET]
+None
+
+[FIGHTER SET]
+None
+
+[ITEM SET]
+[]
+
+[MAP TILES]

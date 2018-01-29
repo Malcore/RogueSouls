@@ -6,3 +6,46 @@ TIME LOG
 11/12/17:	beginning of implementation of interaction system for objects (15 mins)
 12/07/17:	application of interaction system to items, creation of item classifications (1 hour)
 12/12/17:	fixed item interactions and soul pool functionalities (30 mins)
+01/16/18:	(65 mins)
+	-fullscreen_menu() now functioning with cosmetic issues
+	-changed load_map_from_file(), save_map(), new_map() file location to ./maps
+	-found bug: dying in a location will drop souls on x, y coordinate and ignore z coordinate, e.g. souls dropped on 10, 10 on map3 can be picked up on 10, 10 on map0
+	-currently working on: raising and catching exceptions in edit mode, specifically when changing maps with pageup/down keys
+		-relevant functions: handle_keys(), load_map()
+01/22/18:	(185 mins)
+	-created new directory to organize files, 'img/'
+	-moved unused files to old_files/
+	-edited README.md (master branch) on GitHub
+	-fixed error catching of trying to change levels to nonexistant level
+		-still allows switching to empty level file
+	-made outline for fixing of soul drop bug in Player:respawn() function
+	-idea: when saving player's game, save only actions from last bonfire, not from beginning of game
+		-this will keep load times consistent, as long as bonfires are spread evenly throughout game
+		-still has issues if player completes many actions without using bonfire before saving
+	-soul pool is now created when player moves to new map, if that map is the one on which the player last died
+	-instead of saving actions, current player state should be saved, along with global variables, except location
+		-player will respawn at last used bonfire, with full health, etc. and enemies reset
+		-makes loading instant
+	-fixed loading of objects as player traverses maps
+		-remaining issue of tiles becoming unxplored from map change, especially inconsequential ones (such as walking upstairs in firekeepers' hut)
+	-need to finish implementing new method of saving and loading
+		-relevant functions: save_game(), load_game()
+01/25/18: (30 mins)
+	-fixed bug with soul pool spawning every time the player rested
+01/26/18: (50 mins)
+	-fixed infinite while loop on death-continue menu
+	-bug: reloading of map for small height changes, such as going up stairs; causes enemies to respawn and resetting of explored tiles
+	-planning: flow of combat
+		-Classic: acts like turn-based game by waiting for player to attempt an action, then creates action queue of size equal to the time units needed to complete player's action and fills each npc's queue according to its AI
+		-Beginner: static-size queue (given number of time units) is used by player (and AI?). Whenever player wants to complete an action it must be added to the end of the queue. Actions are completed when the turn timer reaches the end of the action block. Actions can be canceled at any time in the queue. The timer can be paused at any time.
+		-Expert: similar to Beginner mode, but the game is divided into rounds. Each round the playe must place whatever actions he or she wants into the queue, which is then executed in full. Actions may still be canceled, but the timer may not be paused, and any empty space in the queue will result in the player doing nothing (or doing a default action chosen by the player?). Timer is paused at the end of each round for the player to add new actions to the queue (possibly keep game in all real-time, don't pause between rounds?).
+01/28/18: (30 mins)
+    -planning: flow of gameplay between combat and non-combat
+        -during combat: queue-based, player-centric action structure defined by game mode
+        -outside of combat (exploration): turn-based/real-time (depending on game mode) movement of characters
+        -switch between exploration to combat occurs when an enemy enters FOV; switch from combat to exploration when no enemies in FOV
+            -may cause some issue if enemies leave FOV during combat and player wants to follow
+    -planning: change of FOV algorithm
+        -directional FOV, 0 or 1 tiles visible behind player, 180-ish degree cone in front of player
+        -characters must be able to turn and have differing turn speeds (depending on weight or if blocking attacks)
+        -ability of characters to independently block FOV and dynamically change blocking status (if character falls, no longer blocks FOV)

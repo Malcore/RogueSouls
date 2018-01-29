@@ -4,7 +4,13 @@ Things Betwixt
 [TILESET]
 ['water', 'stone_wall', 'cave_floor', 'dirt', 'ladder', 'bird_nest', 'dead_bush', 'abyss', 'stairs_down', 'wooden_wall', 'wooden_floor']
 
-[MAP DATA]
+[FIGHTER SET]
+[]
+
+[ITEM SET]
+[]
+
+[MAP TILES]
 7:0:0
 7:0:1
 7:0:2
@@ -3804,7 +3810,11 @@ Things Betwixt
 7:99:34
 7:99:35
 7:99:36
--1:99:37
+7:99:37
 
 [MAP LINKS]
 57:27:0
+
+[FIGHTERS]
+
+[ITEMS]

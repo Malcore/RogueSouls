@@ -1,0 +1,6 @@
+[MAP LABEL]
+Things Betwixt
+[TILESET]
+['stone_wall', 'dirt', 'ladder', 'bird_nest', 'abyss', 'wooden_wall']
+
+[MAP TILES]

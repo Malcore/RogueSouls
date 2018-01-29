@@ -3821,8 +3821,6 @@ Things Betwixt
 [FIGHTERS]
 58:27:0
 60:25:0
-58:27:0
-60:25:0
 
 [ITEMS]
 

@@ -197,6 +197,5 @@ fighters = {
         'wil': 0,
         'level': 1,
         'soul_value': 10
-
     }
 }
