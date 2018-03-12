@@ -85,8 +85,7 @@ NUMBER_MAPS = 4
 # TODO: level-up systems
 # TODO: crafting systems?
 # TODO: Dark Cloud style world building?
-# TODO: fix soul pool object; soul pool should be consumable item
-#       instead of tile, remove from map on death
+# TODO: change setting to Forgotten Realms/Baldur's Gate?
 ########################################################################
 
 
@@ -757,13 +756,14 @@ class WeatherEffects:
         self.label = None
 
 
+# Originally meant for user's character only, also applies to all
+# characters under the user's control.
 class Player:
-    def __init__(self, hunger=0, covenant=None, undead=False, souls=100, skillpoints=0):
+    def __init__(self, hunger=0, covenant=None, undead=False, souls=100):
         self.hunger = hunger
         self.covenant = covenant
         self.undead = undead
         self.souls = souls
-        self.skillpoints = skillpoints
         self.hp_mult = 1.0
         self.stam_mult = 1.0
 
@@ -773,7 +773,6 @@ class Player:
 
     def level_up(self):
         self.owner.fighter.level += 1
-        self.skillpoints += 1
         # TODO: implement level-up system
 
     def respawn(self):
@@ -1688,6 +1687,7 @@ def handle_keys(command=None):
                     edit_mode()
 
                 elif user_input.text == 'S':
+                    save_game()
                     message("Game saved!", colors.green)
 
                 elif user_input.text == 'c':
@@ -1916,12 +1916,6 @@ def equipment_menu():
         options.append("Left Quickslot: None")
     options.append("Close menu")
     return menu("Equipment", options, 30)
-
-
-def skill_menu():
-    options = ['abc']
-    index = menu("Skills", options, SCREEN_WIDTH)
-    return index
 
 
 def drop_menu():
@@ -2441,7 +2435,7 @@ def main_menu():
         # continue saved game
         elif choice is 1:
             if load_game_menu():
-                initialize_variables()
+                #initialize_variables()
                 play_game()
             else:
                 root.clear()
@@ -2506,8 +2500,8 @@ def play_game():
         # handle keys and exit game if needed
         player_action = handle_keys()
 
-        if player_action is not None and player_action != 'didnt-take-turn':
-            save_action(player_action)
+        #if player_action is not None and player_action != 'didnt-take-turn':
+        #    save_action(player_action)
 
         if player_action == 'exit':
             break
@@ -2523,9 +2517,8 @@ def play_game():
         if game_state == 'game_over':
             return
 
+
 # TODO: finish new save_game function
-
-
 def save_game():
     file_name = player.name + "_savegame"
     sf = shelve.open("./saves/" + file_name, 'n')
@@ -2538,43 +2531,15 @@ def save_game():
     sf['death_map_num'] = death_map_num
     sf['player_action'] = player_action
     sf['game_state'] = game_state
-    sf['']
-
-
-objects = []  # everything in the game that isn't a tile
-
-map_num = 0
-map_changed = False
-current_map = []
-level_map = []
-map_tiles = []
-map_fighters = []
-map_items = []
-map_label = ""
-
-
-def save_game():
-    file_name = player.name + "_savegame"
-    savefile = shelve.open("./saves/" + file_name, 'n')
-    for i in range(NUMBER_MAPS):
-        savefile['player_actions_' + str(i)] = []
-    # serialize and save initial game state...all based off seed
-    # serialize and save every player action
-    # only works if game is deterministic, e.g. all randomization determined by seed
-    savefile['seed'] = seed
-
-    # don't save player object separately because shelf module will create two player instances on load
-    savefile['map_num'] = map_num
-    savefile.close()
-
-
-def save_action(action):
-    file_name = player.name + "_savegame"
-    savefile = shelve.open("./saves/" + file_name, 'c')
-    temp_list = savefile['player_actions_' + str(map_num)]
-    temp_list.append(str(serialize_action(action)))
-    savefile['player_actions_' + str(map_num)] = temp_list
-    savefile.close()
+    sf['objects'] = objects[1:]
+    sf['map_num'] = map_num
+    sf['current_map'] = current_map
+    sf['map_tiles'] = map_tiles
+    sf['map_fighters'] = map_fighters
+    sf['map_items'] = map_items
+    sf['map_label'] = map_label
+    sf['player'] = player
+    sf.close();
 
 
 def load_game_menu():
@@ -2587,21 +2552,34 @@ def load_game_menu():
     if choice == len(saved_games) or choice is None:
         return 0
     else:
-        simulate_game(load_game(saved_games[choice] + "_savegame"))
-    return 1
+        load_game(saved_games[choice] + "_savegame")
+        return 1
 
 
 def load_game(file_name):
-    # open the previously saved shelve and load the game data
-    global seed, objects, map_num, filename
+    global seed, game_msgs, respawn_point, respawn_map_num, dropped_souls
+    global death_coords, death_map_num, player_action, game_state, objects
+    global map_num, current_map, map_tiles, map_fighters, map_items, map_label
+    global player
 
-    filename = file_name
-    savefile = shelve.open('./saves/' + file_name, 'r')
-    map_num = savefile['map_num']
-    curr_player_actions = savefile['player_actions_' + str(map_num)]
-    seed = savefile['seed']
-    savefile.close()
-    return curr_player_actions
+    sf = shelve.open("./saves/" + file_name, 'r')
+    seed = sf['seed']
+    game_msgs = sf['game_msgs']
+    respawn_point = sf['respawn_point']
+    respawn_map_num = sf['respawn_map_num']
+    dropped_souls = sf['dropped_souls']
+    death_coords = sf['death_coords']
+    death_map_num = sf['death_map_num']
+    player_action = sf['player_action']
+    game_state = sf['game_state']
+    objects = sf['objects']
+    map_num = sf['map_num']
+    current_map = sf['current_map']
+    map_tiles = sf['map_tiles']
+    map_fighters = sf['map_fighters']
+    map_items = sf['map_items']
+    map_label = sf['map_label']
+    player = sf['player']
 
 
 def quit_game():

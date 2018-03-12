@@ -49,3 +49,13 @@ TIME LOG
         -directional FOV, 0 or 1 tiles visible behind player, 180-ish degree cone in front of player
         -characters must be able to turn and have differing turn speeds (depending on weight or if blocking attacks)
         -ability of characters to independently block FOV and dynamically change blocking status (if character falls, no longer blocks FOV)
+03/11/18: (30 mins)
+    -changed: save functionality to save entire game state, resulting in instant load times
+    -planning: perhaps a change of theme/setting is in order?
+        -dark souls has interesting combat mechanics, with hidden mechanics behind stats unnecesarrily complicated
+        -ds has interesting environments/lore, may be difficult to recognize in roguelike format
+        -create roguelike based in WoT instead? or other well-defined fantasy environment, like forgotten realms?
+            -Forgotten Realms: could start with Baldur's Gate/Sword Coast, or procedural dungeons following dungeon generation rules from DnD
+                -Can include many interesting/existing personalities, Driz'zt, Elminster, etc.
+                -Make party-based roguelike ala Baldur's Gate games?
+                -Game could focus on certain area in certain time period, perhaps eventually with multiple arcs to play through
