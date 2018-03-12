@@ -214,19 +214,6 @@ class Item:
         if self.equipment:
             self.equipment.owner = self
 
-    def retrieve_souls(self, obj):
-        global dropped_souls, objects, spawn_soul_pool
-
-        message("You gather your souls.")
-        player.player.souls += dropped_souls
-        dropped_souls = 0
-        for obj in objects:
-            if obj.name == 'soul_pool':
-                objects.remove(obj)
-                del obj
-        spawn_soul_pool = False
-        return True
-
 
 class Equipment:
     def __init__(self, slot=None, element=None, durability=0, dmg_block=0, equippable_at=None):
@@ -312,15 +299,6 @@ class Tile:
             obj.fighter.death()
         elif obj is not None:
             objects.remove(obj)
-        return True
-
-    def retrieve_souls(self, obj):
-        global dropped_souls
-
-        message("You gather your souls.")
-        getattr(self, self.old_tile)()
-        player.player.souls = dropped_souls
-        dropped_souls = 0
         return True
 
         # Tile types, calling a function will set the tile to that type
@@ -759,38 +737,15 @@ class WeatherEffects:
 # Originally meant for user's character only, also applies to all
 # characters under the user's control.
 class Player:
-    def __init__(self, hunger=0, covenant=None, undead=False, souls=100):
+    def __init__(self, hunger=0, xp=0):
         self.hunger = hunger
-        self.covenant = covenant
-        self.undead = undead
-        self.souls = souls
+        self.xp = xp
         self.hp_mult = 1.0
         self.stam_mult = 1.0
-
-        if self.undead:
-            self.hp_mult = 0.5
-            self.stam_mult = 0.5
 
     def level_up(self):
         self.owner.fighter.level += 1
         # TODO: implement level-up system
-
-    def respawn(self):
-        global respawn_point, dropped_souls, spawn_soul_pool
-
-        # make souls re-obtainable at death position
-        for obj in objects:
-            if obj.name == 'soul_pool':
-                objects.remove(obj)
-                del obj
-        spawn_soul_pool = True
-        load_map(respawn_map_num)
-        (self.owner.x, self.owner.y) = respawn_point
-        self.owner.fighter.curr_hp = self.owner.fighter.hit_points
-        dropped_souls = self.souls
-        self.souls = 0
-        self.undead = True
-        message("You awaken in a familiar place.", colors.light_amber)
 
 
 class Fighter:
@@ -800,7 +755,7 @@ class Fighter:
                  att_slots=0, rhand1=None, rhand2=None, lhand1=None, lhand2=None, head=None, chest=None, legs=None,
                  arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
                  def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0, res_frost=0, res_curse=0,
-                 bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1, soul_value=0, wait_time=0,
+                 bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1, xp_value=0, wait_time=0,
                  dodge_frames=DODGE_TIME, inventory=[], blocking=False, death_func=None, ai=None):
         self.vig = vig
         self.att = att
@@ -844,7 +799,7 @@ class Fighter:
         self.curse_amt = curse_amt
         self.facing = facing
         self.level = level
-        self.soul_value = soul_value
+        self.xp_value = xp_value
         self.wait_time = wait_time
         self.dodge_frames = dodge_frames
         self.inventory = inventory
@@ -1220,18 +1175,8 @@ def player_death():
     death_map_num = map_num
     if player.fighter.curr_hp > 0:
         player.fighter.curr_hp = 0
-    if not player.player.undead:
-        player.player.undead = True
     message("You have died.", colors.dark_crimson)
-    player.fighter.wil -= 1
-    if player.fighter.wil == 0:
-        message("You no longer have the willpower to continue. Your \
-            heart and soul perish, and your body roams mindlessly as a \
-            cursed undead.", colors.darker_amber)
-        msgbox("Press any button to return to main menu...", 24)
-        game_state = 'game_over'
-        return
-    else:
+    """
         while True:
             choice = menu("Would you like to continue?", [
                           'I must persevere...', 'I cannot go on...'], 30)
@@ -1243,6 +1188,7 @@ def player_death():
                 if double_check == 0:
                     game_state = 'game_over'
                     return
+    """
 
 
 def basic_death(fighter):
@@ -1251,7 +1197,7 @@ def basic_death(fighter):
             objects.remove(obj)
             del obj
 
-    player.player.souls += fighter.soul_value
+    player.player.xp += fighter.xp_value
 
 
 ############################################
@@ -1948,10 +1894,6 @@ def change_map(next_map, label, new_num):
     map_label = label
     map_num = new_num
 
-    # add all temporary objects to map that belong there
-    if map_num == death_map_num and spawn_soul_pool is True:
-        create_item('soul_pool', death_coords[0], death_coords[1])
-
 
 def load_map_from_file(map_num):
     global level_map, map_tiles, map_fighters
@@ -2091,7 +2033,7 @@ def render_gui():
                colors.dark_red, colors.darker_red)
     render_bar(1, 3, BAR_LENGTH, 'Stamina', player.fighter.curr_stam, player.fighter.stamina,
                colors.dark_green, colors.darker_green)
-    panel.draw_str(1, 5, "Souls: " + str(player.player.souls),
+    panel.draw_str(1, 5, "XP: " + str(player.player.xp),
                    bg=None, fg=colors.white)
     panel.draw_str(1, 7, "Willpower: " + str(player.fighter.wil),
                    bg=None, fg=colors.white)
@@ -2317,7 +2259,7 @@ def create_fighter(name, x, y):
     fdict = dicts.fighters[name]
     fighter_comp = Fighter(fdict['vig'], fdict['att'], fdict['end'], fdict['strn'],
                            fdict['dex'], fdict['intl'], fdict['fai'], fdict['luc'], fdict['wil'], level=fdict['level'],
-                           soul_value=fdict['soul_value'])
+                           xp_value=fdict['xp_value'])
     fighter = Object(x, y, fdict['char'], name, getattr(
         colors, fdict['color']), fighter=fighter_comp)
     objects.append(fighter)
@@ -2418,7 +2360,7 @@ def main_menu():
         # libtcod.image_blit_2x(img, 0, 8, 3)
 
         root.draw_str(SCREEN_WIDTH // 2 - 7, SCREEN_HEIGHT // 2 -
-                      12, 'RogueSouls', fg=colors.crimson, bg=colors.darkest_han)
+                      12, 'FRealms', fg=colors.crimson, bg=colors.darkest_han)
         root.draw_str(SCREEN_WIDTH // 2 - 8, SCREEN_HEIGHT //
                       2 - 10, 'By Jerezereh')
 
@@ -2526,7 +2468,6 @@ def save_game():
     sf['game_msgs'] = game_msgs
     sf['respawn_point'] = respawn_point
     sf['respawn_map_num'] = respawn_map_num
-    sf['dropped_souls'] = dropped_souls
     sf['death_coords'] = death_coords
     sf['death_map_num'] = death_map_num
     sf['player_action'] = player_action
@@ -2557,7 +2498,7 @@ def load_game_menu():
 
 
 def load_game(file_name):
-    global seed, game_msgs, respawn_point, respawn_map_num, dropped_souls
+    global seed, game_msgs, respawn_point, respawn_map_num
     global death_coords, death_map_num, player_action, game_state, objects
     global map_num, current_map, map_tiles, map_fighters, map_items, map_label
     global player
@@ -2567,7 +2508,6 @@ def load_game(file_name):
     game_msgs = sf['game_msgs']
     respawn_point = sf['respawn_point']
     respawn_map_num = sf['respawn_map_num']
-    dropped_souls = sf['dropped_souls']
     death_coords = sf['death_coords']
     death_map_num = sf['death_map_num']
     player_action = sf['player_action']
@@ -2620,7 +2560,7 @@ def simulate_actions(player_actions):
 
 
 def initialize_variables():
-    global objects, game_msgs, entry_coords, respawn_point, respawn_map_num, dropped_souls
+    global objects, game_msgs, entry_coords, respawn_point, respawn_map_num
     global death_coords, death_map_num, fov_recompute, player_action, mouse_coord, game_state
     global map_num, map_changed, current_map, level_map, map_tiles, map_label, map_fighters, map_items
     global fill_mode, fighter_mode, recurse_count, max_recurse_flag, seed, filename
@@ -2630,10 +2570,8 @@ def initialize_variables():
     entry_coords = (12, 24)
     respawn_point = entry_coords
     respawn_map_num = 0
-    dropped_souls = 0
     death_coords = None
     death_map_num = None
-    spawn_soul_pool = False
 
     fov_recompute = True
     player_action = None
@@ -2665,7 +2603,7 @@ def initialize_variables():
 tdl.set_font('img/unifont_9x15.png')
 tdl.setFPS(LIMIT_FPS)
 root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT,
-                title="RogueSouls", fullscreen=False)
+                title="FRealms", fullscreen=False)
 con = tdl.Console(MAP_WIDTH, MAP_HEIGHT)
 panel = tdl.Console(SCREEN_WIDTH, PANEL_HEIGHT)
 
@@ -2674,10 +2612,8 @@ game_msgs = []  # buffer of the messages that appear on the screen
 entry_coords = (12, 24)
 respawn_point = entry_coords
 respawn_map_num = 0
-dropped_souls = 0
 death_coords = None
 death_map_num = None
-spawn_soul_pool = False
 
 fov_recompute = True
 player_action = None

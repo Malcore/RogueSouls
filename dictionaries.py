@@ -114,18 +114,12 @@ possible_player_actions = ["MV N", "MV NE", "MV E", "MV SE", "MV S", "MV SW", "M
 
 # list of all items in game and in which dictionary their variables are specified in
 items = {
-    'soul_pool': 'map_items'
+
 }
 
 # list of all items that are interactable on map; map items cannot be picked up
 map_items = {
-    'soul_pool': {
-        'char': 'O',
-        'color': 'white',
-        'fighter_interaction': None,
-        'player_interaction': 'retrieve_souls',
-        'object_interaction': None
-    }
+
 }
 
 # list of all items that are consumable, such as potions or 'solid' souls
@@ -148,7 +142,7 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 500
+        'xp_value': 500
     },
 
     'firekeeper': {
@@ -164,7 +158,7 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 100
+        'xp_value': 100
     },
 
     'hollow': {
@@ -180,7 +174,7 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 25
+        'xp_value': 25
     },
 
     'prowler_hound': {
@@ -196,6 +190,6 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 10
+        'xp_value': 10
     }
 }
