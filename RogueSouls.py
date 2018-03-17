@@ -741,7 +741,6 @@ class Player:
         self.hunger = hunger
         self.xp = xp
         self.hp_mult = 1.0
-        self.stam_mult = 1.0
 
     def level_up(self):
         self.owner.fighter.level += 1
@@ -751,25 +750,18 @@ class Player:
 class Fighter:
     # defines something that can take combat actions (e.g. any living character) and gives them combat statistics as
     #   well as defining actions they can take during combat
-    def __init__(self, vig=0, att=0, end=0, strn=0, dex=0, intl=0, fai=0, luc=0, wil=0, equip_load=0, poise=0, item_dis=0,
-                 att_slots=0, rhand1=None, rhand2=None, lhand1=None, lhand2=None, head=None, chest=None, legs=None,
-                 arms=None, ring1=None, ring2=None, neck=None, def_phys=0, def_slash=0, def_blunt=0, def_piercing=0,
-                 def_mag=0, def_fire=0, def_lightn=0, def_dark=0, res_bleed=0, res_poison=0, res_frost=0, res_curse=0,
-                 bleed_amt=0, poison_amt=0, frost_amt=0, curse_amt=0, facing=None, level=1, xp_value=0, wait_time=0,
+    def __init__(self, strn=0, dex=0, con=0, intl=0, wis=0, cha=0, equip_load=0, spell_slots=0, hit_die = 0,
+                 rhand1=None, rhand2=None, lhand1=None, lhand2=None, head=None, chest=None, legs=None,
+                 arms=None, ring1=None, ring2=None, neck=None, facing=None, level=1, xp_value=0, wait_time=0,
                  dodge_frames=DODGE_TIME, inventory=[], blocking=False, death_func=None, ai=None):
-        self.vig = vig
-        self.att = att
-        self.end = end
         self.strn = strn
         self.dex = dex
+        self.con = con
         self.intl = intl
-        self.fai = fai
-        self.luc = luc
-        self.wil = wil
+        self.wis = wis
+        self.cha = cha
         self.equip_load = equip_load
-        self.poise = poise
-        self.item_dis = item_dis
-        self.att_slots = att_slots
+        self.spell_slots = spell_slots
         self.head = head
         self.chest = chest
         self.arms = arms
@@ -781,22 +773,6 @@ class Fighter:
         self.rhand2 = rhand2
         self.lhand1 = lhand1
         self.lhand2 = lhand2
-        self.def_phys = def_phys
-        self.def_slash = def_slash
-        self.def_blunt = def_blunt
-        self.def_piercing = def_piercing
-        self.def_mag = def_mag
-        self.def_fire = def_fire
-        self.def_lightn = def_lightn
-        self.def_dark = def_dark
-        self.res_bleed = res_bleed
-        self.res_poison = res_poison
-        self.res_frost = res_frost
-        self.res_curse = res_curse
-        self.bleed_amt = bleed_amt
-        self.poison_amt = poison_amt
-        self.frost_amt = frost_amt
-        self.curse_amt = curse_amt
         self.facing = facing
         self.level = level
         self.xp_value = xp_value
@@ -814,62 +790,27 @@ class Fighter:
 
         # Beginning of derived statistics
 
-        # Vigor effects
-        # +0.4 def/vig and 0.2 res/vig
-        self.hit_points = int(math.ceil(40 * self.vig - 1.15 * self.vig))
-        self.def_lightn += 0.4 * self.vig
-        self.def_mag += 0.4 * self.vig
-        self.def_fire += 0.4 * self.vig
-        self.def_lightn += 0.4 * self.vig
-        self.def_dark += 0.4 * self.vig
-        self.res_bleed += 0.2 * self.vig
-        self.res_poison += 0.2 * self.vig
-        self.res_frost += 0.2 * self.vig
-        self.res_curse += 0.2 * self.vig
-
-        # Attunement effects
-        # TODO: attunement stat effects
-        self.att_points = 10
-
-        # Endurance effects
-        # stamina = 0.0184x^2 + 1.2896x + 78.73
-        # 88 stamina at base (10) endurance
-        # +1.1 lightning def/end, + 0.4 other def/end, and +0.2 elemental res/end
-        self.stamina = math.floor(
-            (0.0184 * self.end ** 2) + (1.2896 * self.end) + 78.73)
-        self.def_lightn += 1.1 * self.end
-        self.def_mag += 0.4 * self.end
-        self.def_fire += 0.4 * self.end
-        self.def_lightn += 0.4 * self.end
-        self.def_dark += 0.4 * self.end
-        self.res_bleed += 0.2 * self.end
-        self.res_poison += 0.2 * self.end
-        self.res_frost += 0.2 * self.end
-        self.res_curse += 0.2 * self.end
-
         # Strength effects
-        # TODO: strength stat effects
+        # TODO
+        self.weight_cap = self.strn * 15
 
         # Dexterity effects
         # TODO: show effects of dex on dodge frames
         self.dodge_frames += self.dex
+        self.ac = 10 + math.floor(self.dex - 10 / 2)
 
         # Intelligence effects
         # TODO: intelligence stat effects
 
-        # Faith effects
-        # TODO: faith stat effects
+        # Wisdom effects
+        # TODO
 
-        # Luck effects
-        # TODO: luck stat effects
-
-        # Will effects
-        # TODO: will stat effects
+        # Charisma effects
+        # TODO
 
         # Other statistics
         self.curr_hp = self.hit_points
         self.curr_ap = self.att_points
-        self.curr_stam = self.stamina
         self.curr_r = rhand1
         self.curr_l = lhand1
 
@@ -2031,8 +1972,6 @@ def render_gui():
     # show the player's stats
     render_bar(1, 1, BAR_LENGTH, 'HP', player.fighter.curr_hp, player.fighter.hit_points,
                colors.dark_red, colors.darker_red)
-    render_bar(1, 3, BAR_LENGTH, 'Stamina', player.fighter.curr_stam, player.fighter.stamina,
-               colors.dark_green, colors.darker_green)
     panel.draw_str(1, 5, "XP: " + str(player.player.xp),
                    bg=None, fg=colors.white)
     panel.draw_str(1, 7, "Willpower: " + str(player.fighter.wil),
@@ -2257,11 +2196,9 @@ def create_fighter(name, x, y):
     global objects
 
     fdict = dicts.fighters[name]
-    fighter_comp = Fighter(fdict['vig'], fdict['att'], fdict['end'], fdict['strn'],
-                           fdict['dex'], fdict['intl'], fdict['fai'], fdict['luc'], fdict['wil'], level=fdict['level'],
-                           xp_value=fdict['xp_value'])
-    fighter = Object(x, y, fdict['char'], name, getattr(
-        colors, fdict['color']), fighter=fighter_comp)
+    fighter_comp = Fighter(fdict['strn'], fdict['dex'], fdict['con'], fdict['intl'], fdict['wis'], fdict['cha'],
+                            level=fdict['level'], xp_value=fdict['xp_value'])
+    fighter = Object(x, y, fdict['char'], name, getattr(colors, fdict['color']), fighter=fighter_comp)
     objects.append(fighter)
 
 

@@ -61,3 +61,10 @@ TIME LOG
                 -Game could focus on certain area in certain time period, perhaps eventually with multiple arcs to play through
     -created new branch: frealms-devel
         -removed souls mechanics from game, replaced with generic "xp"
+03/16/18: (30 mins)
+    -changed stats of fighters, removed some references to them
+    -added some derived statistics for new stats
+    -planning: make clickable gui elements for different abilities/attacks of characters, similar to baldur's gate?
+        -TDL gives 'mousedown' event, can measure location on screen and react accordingly (e.g. click on sword icon then on enemy attacks that enemy)
+        -can also provide keyboard controls so players could tab through party members, press buttons to open menus for attacks and spells
+    -need to write out umls/basic game outline before coding, some complications can be solved easier on paper
