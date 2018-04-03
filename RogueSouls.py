@@ -1,6 +1,7 @@
 import tdl
 import colors
 import math
+import random
 import textwrap
 import sys
 import os
@@ -760,6 +761,12 @@ class Fighter:
         self.intl = intl
         self.wis = wis
         self.cha = cha
+        self.strn_mod = math.floor(strn - 10 / 2)
+        self.dex_mod = math.floor(dex - 10 / 2)
+        self.con_mod = math.floor(con - 10 / 2)
+        self.intl_mod = math.floor(intl - 10 / 2)
+        self.wis_mod = math.floor(wis - 10 / 2)
+        self.cha_mod = math.floor(cha - 10 / 2)
         self.equip_load = equip_load
         self.spell_slots = spell_slots
         self.head = head
@@ -799,6 +806,11 @@ class Fighter:
         self.dodge_frames += self.dex
         self.ac = 10 + math.floor(self.dex - 10 / 2)
 
+        # Constitution effects
+        self.hit_points = hit_die + self.con_mod
+        for i in range(self.level - 1):
+            self.hit_points += random.randint(0, self.hit_die + self.con_mod)
+
         # Intelligence effects
         # TODO: intelligence stat effects
 
@@ -810,7 +822,6 @@ class Fighter:
 
         # Other statistics
         self.curr_hp = self.hit_points
-        self.curr_ap = self.att_points
         self.curr_r = rhand1
         self.curr_l = lhand1
 
@@ -1974,8 +1985,6 @@ def render_gui():
                colors.dark_red, colors.darker_red)
     panel.draw_str(1, 5, "XP: " + str(player.player.xp),
                    bg=None, fg=colors.white)
-    panel.draw_str(1, 7, "Willpower: " + str(player.fighter.wil),
-                   bg=None, fg=colors.white)
 
     # display names of objects under the mouse
     if mouse_coord:
@@ -2197,7 +2206,8 @@ def create_fighter(name, x, y):
 
     fdict = dicts.fighters[name]
     fighter_comp = Fighter(fdict['strn'], fdict['dex'], fdict['con'], fdict['intl'], fdict['wis'], fdict['cha'],
-                            level=fdict['level'], xp_value=fdict['xp_value'])
+                            spell_slots=fdict['sslots'], hit_die=fdict['hd'], level=fdict['level'],
+                            xp_value=fdict['xp_value'])
     fighter = Object(x, y, fdict['char'], name, getattr(colors, fdict['color']), fighter=fighter_comp)
     objects.append(fighter)
 
