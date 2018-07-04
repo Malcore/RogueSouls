@@ -77,35 +77,33 @@ acc_affix = {
     '': ''
 }
 
-# AI Notation:
-# Right-hand attack: R
-# Left-hand attack: L
-# Two-hand attack: T
-# Block: B
-# Dodge: D
-# Wait: W
-# Repeat pattern: +
-# Attack Modifier (Heavy): H
-
-# If AI attempts to attack with one-hand when wielding two-handed weapon, consume two one-handed inputs for each two-
-# handed attack. E.g. if pattern is RLRR+ and creature only has two-handed weapon, pattern is converted to TT+.
-# If an attack modifier is present, the attack changes accordingly. If an attack is being consumed to become a two-
-# handed, it gains all modifiers of the individual attacks, if applicable (each modifier can only be applied once).
+# AI classified into profiles which will determine likelihood of enemy using actions. Each enemy has definitions of actions
+#   and a chosen profile.
 ai = {
-    'basic': {
-        'def': ['R', 'B', '+'],
-        'dual': ['R', 'L', 'R', 'L', 'D', 'D', '+'],
-        'th': ['T', 'T', 'B', 'B', '+']
+    'aggressive': {
+
     },
 
-    'aggressive': {
-        'def': ['R', 'R', 'R', 'R', 'W', '+'],
-        'dual': ['R', 'L', 'R', 'L', 'R', 'L', 'W', '+'],
-        'th': ['T', '+']
+    'basic': {
+        'move_towards_or_attack': 100
+    },
+
+    'coward': {
+        'move_away': 75,
+        'move_towards_or_attack': 25
     },
 
     'none': {
 
+    },
+
+    # new ai system: each enemy has an ai profile and dictionary of possible actions, each action has
+    #   a name, number of frames needed, 
+    'prowler_hound': {
+        'profile': 'coward',
+        'queue_size': 2,
+        'move': 5,
+        'bite': ['attack', 10]
     }
 }
 
@@ -134,6 +132,17 @@ consumable_items = {}
 # list of all items that can be equipped to a fighter object
 equippable_items = {}
 
+# dictionary of all fighters in game with all attributes of each
+# most attributes are self-explanatory, but here is documentation of each stat in case
+# char = character used to represent it on the screen
+# color = color of the char
+# vig = vigor stat
+# att = attunement stat
+# end = endurance stat
+# ...
+# level = level of the enemy
+# soul_value = how many souls player receives
+# morale = %hp at which the fighter loses its will to fight and runs (e.g. a 10 means fighter runs if at 10% hp or less)
 fighters = {
     'cyclops': {
         'char': 'C',
@@ -148,7 +157,8 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 500
+        'soul_value': 500,
+        'morale': 10
     },
 
     'firekeeper': {
@@ -164,7 +174,8 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 100
+        'soul_value': 100,
+        'morale': 0
     },
 
     'hollow': {
@@ -180,7 +191,8 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 25
+        'soul_value': 25,
+        'morale': 0
     },
 
     'prowler_hound': {
@@ -196,6 +208,7 @@ fighters = {
         'luc': 1,
         'wil': 0,
         'level': 1,
-        'soul_value': 10
+        'soul_value': 10,
+        'morale': 100
     }
 }

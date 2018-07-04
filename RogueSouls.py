@@ -9,14 +9,16 @@ import shelve
 import datetime
 import re
 import dictionaries as dicts
+import random
 
 # Global variables
 LIMIT_FPS = 30
 MAX_RECURSE = 800
 
-# actual size of the window in characters (or 960x720 pixels)
+# actual size of the window in number of characters
+# TODO: make screen size alterable/dynamic?
 SCREEN_WIDTH = 100
-SCREEN_HEIGHT = 50
+SCREEN_HEIGHT = 49
 
 # size of the map
 MAP_WIDTH = 100
@@ -28,7 +30,7 @@ MIN_HEIGHT = 0
 
 # bottom gui panel constants
 BAR_LENGTH = 20
-PANEL_HEIGHT = 12
+PANEL_HEIGHT = 11
 PANEL_Y = SCREEN_HEIGHT - PANEL_HEIGHT
 
 # message log
@@ -50,7 +52,7 @@ TORCH_RADIUS = 10
 # Each action during combat takes a different amount of time, which is
 #   modified by equip load, dex, the weight of the
 # item used, etc. The base values for each type of action are given here
-#    in frames (20 fps):
+#    in frames (@20 fps):
 # number of frames for a light attack to complete
 L_ATT_SPEED = 20
 # number of frames for a heavy attack to complete
@@ -1114,16 +1116,33 @@ class Fighter:
 
 
 class AI:
-    def __init__(self, name=None, flag="def", move_set=[]):
+    def __init__(self, name=None, queue_size=0, profile=None, move_set=[]):
         self.name = name
-        self.flag = flag
+        self.profile = profile
+        self.queue_size = queue_size
         self.move_set = move_set
+        self.queue = []
 
-    def build_queue(self):
+    def load_move_set(self):
         if self.name is None:
             return
         else:
-            self.move_set = dicts.AI[self.name][self.flag]
+            self.profile = dicts.ai[self.name]['profile']
+            self.queue_size = dicts.ai[self.name]['queue_size']
+            for num in range(2, dicts.ai[self.name]):
+                self.move_set = dicts.ai[self.name][num]
+
+    def build_queue(self):
+        if self.move_set == []:
+            return
+        else:
+            # choose action according to profile, add to queue, repeat until queue full
+            while len(self.queue) < self.queue_size:
+                choice = random.randrange(101)
+                for num in dicts.ai[self.profile]:
+                    if choice < dicts.ai[self.profile][num]:
+                        self.queue.add(dicts.ai[self.profile][num])
+                        print(dicts.ai[self.profile][num])
 
 
 #################################
@@ -1234,7 +1253,7 @@ def player_death():
     else:
         while True:
             choice = menu("Would you like to continue?", [
-                          'I must persevere...', 'I cannot go on...'], 30)
+                          'I must persevere...', 'I cannot go on...'], 24)
             if choice is 0:
                 player.player.respawn()
                 return
@@ -2441,7 +2460,8 @@ def main_menu():
                 root.clear()
         # quit
         elif choice is 2:
-            exit()
+            quit_game()
+        # debug
         elif choice is 3:
             initialize_variables()
             debug_mode = True
@@ -2455,7 +2475,7 @@ def new_game():
 
     if game_state != 'simulating':
         # generate game seed based on current time
-        generate_seed()
+        random.seed()
 
     # first create the player out of its components
     player_comp = Player()
@@ -2583,7 +2603,7 @@ def load_game(file_name):
 
 
 def quit_game():
-    sys.exit()
+    sys.exit(0)
 
 
 def generate_seed():
