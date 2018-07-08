@@ -231,8 +231,7 @@ class Item:
 
 
 class Equipment:
-    def __init__(self, slot=None, element=None, durability=0, dmg_block=0, equippable_at=None):
-        self.slot = slot
+    def __init__(self, element=None, durability=0, dmg_block=0, equippable_at=None):
         self.element = element
         self.durability = durability
         self.dmg_block = dmg_block
@@ -1034,71 +1033,23 @@ class Fighter:
         else:
             basic_death(self)
 
+    # handles player input and passes chosen parameter
     def equip(self, item):
-        success = False
-        options = ['Head', 'Chest', 'Arms', 'Legs', 'Neck',
-                   'Right Hand', 'Left Hand', 'Right Ring',
-                   'Left Ring', 'Right Hand Quick Slot',
-                   'Left Hand Quick Slot']
-        choice = menu("Equip in which slot?", options, SCREEN_WIDTH)
-        if choice is None or choice > len(options):
+        choice = menu("Equip in which slot?", equipment_slots_print, 30)
+        if choice is None or choice > len(equipment_slots_print):
             return
-        if choice is 0 and item.equippable_at is 'head':
-            self.head = item
-            item.equipped_at = 'head'
-            success = True
-        elif choice is 1 and item.equippable_at is 'chest':
-            self.chest = item
-            item.equipped_at = 'chest'
-            success = True
-        elif choice is 2 and item.equippable_at is 'arms':
-            self.arms = item
-            item.equipped_at = 'arms'
-            success = True
-        elif choice is 3 and item.equippable_at is 'legs':
-            self.legs = item
-            item.equipped_at = 'legs'
-            success = True
-        elif choice is 4 and item.equippable_at is 'neck':
-            self.neck = item
-            item.equipped_at = 'neck'
-            success = True
-        elif choice is 5 and item.equippable_at is 'hand':
-            self.rhand1 = item
-            item.equipped_at = 'rhand1'
-            success = True
-        elif choice is 6 and item.equippable_at is 'hand':
-            self.lhand1 = item
-            item.equipped_at = 'lhand1'
-            success = True
-        elif choice is 7 and item.equippable_at is 'ring':
-            self.ring1 = item
-            item.equipped_at = 'ring1'
-            success = True
-        elif choice is 8 and item.equippable_at is 'ring':
-            self.ring2 = item
-            item.equipped_at = 'ring2'
-            success = True
-        elif choice is 9 and item.equippable_at is 'hand':
-            self.rhand2 = item
-            item.equipped_at = 'rhand2'
-            success = True
-        elif choice is 10 and item.equippable_at is 'hand':
-            self.lhand2 = item
-            item.equipped_at = 'lhand2'
-            success = True
-        if success:
-            item.is_equipped = True
-            message('Equipped ' + item.owner.owner.name + ' on ' +
-                    options[choice] + '.', colors.light_green)
+        else:
+            self.equip_to_slot(item, equipment_slots[choice])
 
+    # handles equipping of item to a slot
     def equip_to_slot(self, equipment, slot):
         if equipment.equippable_at in slot:
+            self.unequip(equipment)
             setattr(self, slot, equipment)
             equipment.equipped_at = slot
             equipment.is_equipped = True
-            message("Equipped " + equipment.owner.owner.name +
-                    " to " + slot + ".", colors.light_green)
+            message('Equipped ' + equipment.owner.owner.name + ' on ' +
+                    slot + '.', colors.light_green)
         else:
             message(equipment.owner.owner.name.capitalize() +
                     " cannot be equipped to your " + slot + ".",
@@ -1109,7 +1060,7 @@ class Fighter:
         if not equipment.is_equipped:
             return
         message("Unequipped " + equipment.owner.owner.name +
-                " from " + equipment.slot + ".", colors.light_green)
+                " from " + equipment.equippable_at + ".", colors.light_green)
         setattr(self, str(equipment.equipped_at), None)
         equipment.is_equipped = False
         equipment.equipped_at = None
@@ -1857,8 +1808,8 @@ def inventory_menu():
     return index
 
 
-# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rring-5, lring-6,
-#   rhand-7, lhand-8, rqslot-9, lqslot-10, close-11
+# Indices: head-0, chest-1, arms-2, legs-3, neck-4, rhand-5, lhand-6, 
+#   rqslot-7, lqslot-8, ring-9, lring-10, close-11
 def equip_or_unequip(fighter, index):
     if index is None or index > 10:
         return
@@ -1869,14 +1820,12 @@ def equip_or_unequip(fighter, index):
         fighter.unequip(equipment)
     else:
         item_choice = inventory_menu()
-        if item_choice is not None:
+        if item_choice is not None and item_choice < len(fighter.inventory):
             equipment = fighter.inventory[item_choice].item.equipment
             fighter.equip_to_slot(equipment, equipment_slots[index])
 
 
 def equipment_menu():
-    # TODO: fix equipment menu by showing each equipment slot and what
-    #   is currently equipped there
     options = []
     if player.fighter.head:
         options.append(
@@ -1903,16 +1852,6 @@ def equipment_menu():
             "Neck: " + str(player.fighter.neck.owner.owner.name).capitalize())
     else:
         options.append("Necks: None")
-    if player.fighter.ring1:
-        options.append("Right Ring: " +
-                       str(player.fighter.ring1.owner.owner.name).capitalize())
-    else:
-        options.append("Right Ring: None")
-    if player.fighter.ring2:
-        options.append("Left Ring: " +
-                       str(player.fighter.ring2.owner.owner.name).capitalize())
-    else:
-        options.append("Left Ring: None")
     if player.fighter.rhand1:
         options.append(
             "Right Hand: " + str(player.fighter.rhand1.owner.owner.name).capitalize())
@@ -1924,15 +1863,25 @@ def equipment_menu():
     else:
         options.append("Left Hand: None")
     if player.fighter.rhand2:
-        options.append("Right Quickslot: " +
+        options.append("Right Hand Quickslot: " +
                        str(player.fighter.rhand2.owner.owner.name).capitalize())
     else:
-        options.append("Right Quickslot: None")
+        options.append("Right Hand Quickslot: None")
     if player.fighter.lhand2:
-        options.append("Left Quickslot: " +
+        options.append("Left Hand Quickslot: " +
                        str(player.fighter.lhand2.owner.owner.name).capitalize())
     else:
-        options.append("Left Quickslot: None")
+        options.append("Left Hand Quickslot: None")
+    if player.fighter.ring1:
+        options.append("Right Ring Slot: " +
+                       str(player.fighter.ring1.owner.owner.name).capitalize())
+    else:
+        options.append("Right Ring Slot: None")
+    if player.fighter.ring2:
+        options.append("Left Ring Slot: " +
+                       str(player.fighter.ring2.owner.owner.name).capitalize())
+    else:
+        options.append("Left Ring Slot: None")
     options.append("Close menu")
     return menu("Equipment", options, 30)
 
@@ -2497,8 +2446,7 @@ def new_game():
     #message("The seed of this game is: " + str(seed) + ".")
 
     # initial equipment: a broken sword
-    equipment_component = Equipment(
-        slot='hand', durability=10, equippable_at='hand')
+    equipment_component = Equipment(durability=10, equippable_at='hand')
     item_comp = Item(weight=2, uses=0, equipment=equipment_component)
     sword = Object(0, 0, '-', name="Broken Sword", color=colors.sky, block_sight=False, item=item_comp,
                    always_visible=True)
@@ -2725,6 +2673,10 @@ filename = ''
 door_tiles = ['door_hor', 'door_vert']
 special_tiles = ['fog_wall']
 equipment_slots = ['head', 'chest', 'arms', 'legs', 'neck',
-                   'rring', 'lring', 'rhand1', 'rhand2', 'lhand1', 'lhand2']
+                    'rhand1', 'lhand1', 'rhand2', 'lhand2', 'ring1', 'ring2']
+equipment_slots_print = ['Head', 'Chest', 'Arms', 'Legs', 'Neck',
+                   'Right Hand', 'Left Hand', 'Right Hand Quick Slot',
+                   'Left Hand Quick Slot', 'Right Ring Slot',
+                   'Left Ring Slot']
 
 main_menu()
