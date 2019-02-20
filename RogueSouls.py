@@ -1095,6 +1095,10 @@ class AI:
                         self.queue.add(dicts.ai[self.profile][num])
                         print(dicts.ai[self.profile][num])
 
+    # def take_turn(self):
+    #     if queue_size > 0:
+    #         self.owner.handle_attack_move()
+
 
 #################################
 # damage functions
@@ -2283,11 +2287,11 @@ def create_fighter(name, x, y):
     global objects
 
     fdict = dicts.fighters[name]
+    ai_comp = AI('prowler_hound')
     fighter_comp = Fighter(fdict['vig'], fdict['att'], fdict['end'], fdict['strn'],
                            fdict['dex'], fdict['intl'], fdict['fai'], fdict['luc'], fdict['wil'], level=fdict['level'],
-                           soul_value=fdict['soul_value'])
-    fighter = Object(x, y, fdict['char'], name, getattr(
-        colors, fdict['color']), fighter=fighter_comp)
+                           soul_value=fdict['soul_value'], ai=ai_comp)
+    fighter = Object(x, y, fdict['char'], name, getattr(colors, fdict['color']), fighter=fighter_comp)
     objects.append(fighter)
 
 
@@ -2370,7 +2374,7 @@ def new_map(map_num):
 
 ############################################
 # intro screen functions
-# ()
+############################################
 def main_menu():
     global game_state, game_msgs, objects, map_num, player_action, debug_mode
 
@@ -2467,6 +2471,9 @@ def play_game():
 
         # handle keys and exit game if needed
         player_action = handle_keys()
+        if player_action != 'didnt-take-turn':
+            #ai_take_turn()
+            continue
 
         #if player_action is not None and player_action != 'didnt-take-turn':
         #    save_action(player_action)
