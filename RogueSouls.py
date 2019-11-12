@@ -1,4 +1,5 @@
-import tdl
+import tcod as libtcodpy
+import tcod.event
 import colors
 import math
 import textwrap
@@ -922,7 +923,7 @@ class Fighter:
     def handle_attack_move(self, side, type):
         keypress = False
         while not keypress:
-            for event in tdl.event.get():
+            for event in libtcodpy.event.get():
                 if event.type == 'KEYDOWN':
                     user_input = event
                     keypress = True
@@ -1732,7 +1733,7 @@ def handle_keys(command=None):
 
 
 def simulate_key(command):
-    user_input = tdl.event.KeyDown(key='', text='')
+    user_input = libtcodpy.event.KeyDown(scancode=0, sym=None, mod=None)
     if command == "MV N":
         user_input.key = 'TEXT'
         user_input.text = u'8'

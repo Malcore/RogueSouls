@@ -1,5 +1,6 @@
 # Repository-specific files and directories
 saves/
+.saves/
 .idea/
 
 # Byte-compiled / optimized / DLL files

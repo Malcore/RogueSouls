@@ -1,12 +1,14 @@
 import tdl
 import textwrap
 import colors
+import os
 
 import Globals as gbl
 import Utils as utl
 
 
-tdl.set_font('terminal12x12_gs_ro.png', greyscale=True, altLayout=False)
+tdl.set_font(os.path.abspath('roguelike-development/code_refactor/terminal12x12_gs_ro.png'), greyscale=True,
+             altLayout=False)
 tdl.setFPS(gbl.LIMIT_FPS)
 root = tdl.init(gbl.SCREEN_WIDTH, gbl.SCREEN_HEIGHT, title="RogueSouls", fullscreen=False)
 con = tdl.Console(gbl.MAP_WIDTH, gbl.MAP_HEIGHT)
@@ -20,8 +22,8 @@ def render_all():
     
     if gbl.fov_recompute:
         gbl.fov_recompute = False
-        gbl.visible_tiles = tdl.map.quickFOV(gbl.player.x, gbl.player.y, is_visible_tile, fov=gbl.FOV_ALGO, radius=gbl.WORLD_FOV_RAD, 
-        	lightWalls=gbl.FOV_LIGHT_WALLS)
+        gbl.visible_tiles = tdl.map.quickFOV(gbl.player.x, gbl.player.y, is_visible_tile, fov=gbl.FOV_ALGO,
+                                             radius=gbl.WORLD_FOV_RAD, lightWalls=gbl.FOV_LIGHT_WALLS)
 
         # go through all tiles, and set their background color according to the FOV
         for y in range(gbl.MAP_HEIGHT):
